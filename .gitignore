@@ -78,6 +78,6 @@ streamerData/recordings/**/*.avi
 # Generated splash preview (keep static splash.png)
 splash_preview.gif
 
-# Executable files
-*.exe
-StreamerViewer_Standalone.exe
+# Executable files (but allow the main standalone executable)
+# *.exe - commented out to allow StreamerViewer_Standalone.exe
+# StreamerViewer_Standalone.exe - commented out to allow in repository
