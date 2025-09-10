@@ -1,0 +1,7 @@
+# Runtime dependencies for Streamer Viewer
+Flask>=2.3.0
+pywebview>=4.0.0
+
+# Development/Build dependencies
+# Note: pyinstaller is only needed for building executables
+pyinstaller>=6.0.0

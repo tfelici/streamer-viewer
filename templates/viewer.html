@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Viewer - {{ track.track_id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <div class="viewer-container">
+        <header class="viewer-header">
+            <h1>Track: {{ track.track_id }}</h1>
+            <div class="track-info">
+                <span>Created: {{ track.created | datetimeformat }}</span>
+                <span>Duration: {{ track.duration | durationformat }}</span>
+                <span>Points: {{ track.coord_count }}</span>
+            </div>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">← Back to List</a>
+        </header>
+
+        <div class="viewer-content">
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+            
+            <div class="splitter" id="splitter"></div>
+            
+            {% if video %}
+            <div class="video-container">
+                <video id="video-player" controls>
+                    <source src="{{ url_for('serve_video', filename=video.filename) }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <div class="video-info">
+                    <span>Video: {{ video.filename }}</span>
+                    <span>Recorded: {{ video.datetime | datetimeformat }}</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="video-container">
+                <div class="no-video">
+                    <p>No matching video found for this track</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="controls">
+            <div class="timeline-container">
+                <input type="range" id="timeline-slider" min="0" max="100" value="0" class="timeline-slider">
+                <div class="timeline-labels">
+                    <span id="current-time">00:00</span>
+                    <span id="total-time">{{ track.duration | durationformat }}</span>
+                </div>
+            </div>
+            <div class="playback-controls">
+                <button id="play-pause-btn" class="btn btn-primary">Play</button>
+                <button id="reset-btn" class="btn btn-secondary">Reset</button>
+                <label for="speed-select">Speed:</label>
+                <select id="speed-select">
+                    <option value="0.25">0.25x</option>
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="2">2x</option>
+                    <option value="4">4x</option>
+                    <option value="8">8x</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Track data from server
+        const trackData = {
+            track: {{ track | tojson }},
+            coordinates: {{ coordinates | tojson }},
+            video: {{ video | tojson if video else 'null' }}
+        };
+
+        let map;
+        let trackPath;
+        let currentMarker;
+        let isPlaying = false;
+        let currentIndex = 0;
+        let animationId;
+        let playbackSpeed = 1;
+        let videoPlayer;
+        let videoStartTime = null;
+
+        // Initialize the map and track viewer
+        function initializeViewer() {
+            initializeMap();
+            initializeControls();
+            initializeSplitter();
+            if (trackData.video) {
+                initializeVideo();
+            }
+            drawTrack();
+        }
+
+        function initializeMap() {
+            // Create map
+            map = L.map('map');
+
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Calculate bounds from coordinates
+            if (trackData.coordinates.length > 0) {
+                const bounds = L.latLngBounds();
+                trackData.coordinates.forEach(coord => {
+                    bounds.extend([coord.location.latitude, coord.location.longitude]);
+                });
+                map.fitBounds(bounds, { padding: [20, 20] });
+            }
+        }
+
+        function initializeSplitter() {
+            const splitter = document.getElementById('splitter');
+            const mapContainer = document.querySelector('.map-container');
+            const videoContainer = document.querySelector('.video-container');
+            const viewerContent = document.querySelector('.viewer-content');
+            
+            let isResizing = false;
+            
+            splitter.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+                
+                const viewerRect = viewerContent.getBoundingClientRect();
+                const newMapWidth = e.clientX - viewerRect.left;
+                const totalWidth = viewerRect.width;
+                const splitterWidth = 4;
+                
+                // Calculate percentages
+                const mapPercent = Math.max(20, Math.min(80, (newMapWidth / totalWidth) * 100));
+                const videoPercent = Math.max(20, 100 - mapPercent - (splitterWidth / totalWidth) * 100);
+                
+                // Apply flex-basis instead of flex
+                mapContainer.style.flexBasis = mapPercent + '%';
+                videoContainer.style.flexBasis = videoPercent + '%';
+                mapContainer.style.flexGrow = '0';
+                mapContainer.style.flexShrink = '0';
+                videoContainer.style.flexGrow = '0';
+                videoContainer.style.flexShrink = '0';
+                
+                // Trigger map resize
+                if (map) {
+                    setTimeout(() => map.invalidateSize(), 0);
+                }
+            });
+            
+            document.addEventListener('mouseup', function() {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
+        }
+
+        function initializeVideo() {
+            videoPlayer = document.getElementById('video-player');
+            if (videoPlayer && trackData.video) {
+                // Calculate video start time relative to track
+                videoStartTime = trackData.video.timestamp - trackData.track.start_time;
+                
+                // Sync video with timeline
+                videoPlayer.addEventListener('timeupdate', function() {
+                    if (!isPlaying) {
+                        const videoTime = videoPlayer.currentTime;
+                        const trackTime = videoStartTime + videoTime;
+                        updateTrackPosition(trackTime);
+                    }
+                });
+            }
+        }
+
+        function initializeControls() {
+            const playPauseBtn = document.getElementById('play-pause-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const speedSelect = document.getElementById('speed-select');
+            const timelineSlider = document.getElementById('timeline-slider');
+
+            playPauseBtn.addEventListener('click', togglePlayback);
+            resetBtn.addEventListener('click', resetPlayback);
+            speedSelect.addEventListener('change', function() {
+                playbackSpeed = parseFloat(this.value);
+            });
+
+            timelineSlider.addEventListener('input', function() {
+                const percentage = this.value / 100;
+                const trackTime = trackData.track.duration * percentage;
+                updateTrackPosition(trackTime);
+                
+                // Update video position if available
+                if (videoPlayer && trackData.video) {
+                    const videoTime = trackTime - videoStartTime;
+                    if (videoTime >= 0 && videoTime <= videoPlayer.duration) {
+                        videoPlayer.currentTime = videoTime;
+                    }
+                }
+            });
+        }
+
+        function drawTrack() {
+            if (trackData.coordinates.length === 0) return;
+
+            // Create track path
+            const trackPoints = trackData.coordinates.map(coord => 
+                [coord.location.latitude, coord.location.longitude]
+            );
+
+            trackPath = L.polyline(trackPoints, {
+                color: '#FF0000',
+                weight: 3,
+                opacity: 0.8
+            }).addTo(map);
+
+            // Add start marker
+            const startPoint = trackData.coordinates[0];
+            L.marker([startPoint.location.latitude, startPoint.location.longitude])
+                .bindPopup('Start')
+                .addTo(map);
+
+            // Add end marker
+            const endPoint = trackData.coordinates[trackData.coordinates.length - 1];
+            L.marker([endPoint.location.latitude, endPoint.location.longitude])
+                .bindPopup('End')
+                .addTo(map);
+
+            // Create current position marker
+            currentMarker = L.circleMarker([startPoint.location.latitude, startPoint.location.longitude], {
+                color: '#0000FF',
+                fillColor: '#0000FF',
+                fillOpacity: 0.8,
+                radius: 8
+            }).addTo(map);
+        }
+
+        function togglePlayback() {
+            const playPauseBtn = document.getElementById('play-pause-btn');
+            
+            if (isPlaying) {
+                pausePlayback();
+            } else {
+                startPlayback();
+            }
+        }
+
+        function startPlayback() {
+            isPlaying = true;
+            document.getElementById('play-pause-btn').textContent = 'Pause';
+            
+            if (videoPlayer) {
+                videoPlayer.play();
+            }
+            
+            animateTrack();
+        }
+
+        function pausePlayback() {
+            isPlaying = false;
+            document.getElementById('play-pause-btn').textContent = 'Play';
+            
+            if (videoPlayer) {
+                videoPlayer.pause();
+            }
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        }
+
+        function resetPlayback() {
+            pausePlayback();
+            currentIndex = 0;
+            document.getElementById('timeline-slider').value = 0;
+            document.getElementById('current-time').textContent = '00:00';
+            
+            if (trackData.coordinates.length > 0) {
+                const startPoint = trackData.coordinates[0];
+                currentMarker.setLatLng([startPoint.location.latitude, startPoint.location.longitude]);
+            }
+            
+            if (videoPlayer) {
+                videoPlayer.currentTime = 0;
+            }
+        }
+
+        function animateTrack() {
+            if (!isPlaying) return;
+            
+            const startTime = performance.now();
+            
+            function animate(currentTime) {
+                if (!isPlaying) return;
+                
+                // Check if we've reached the end of the track
+                if (currentIndex >= trackData.coordinates.length - 1) {
+                    pausePlayback();
+                    return;
+                }
+                
+                const elapsed = (currentTime - startTime) * playbackSpeed;
+                const coord = trackData.coordinates[currentIndex];
+                const nextCoord = trackData.coordinates[currentIndex + 1];
+                
+                if (!nextCoord) {
+                    pausePlayback();
+                    return;
+                }
+                
+                const coordDuration = (nextCoord.timestamp - coord.timestamp) * 1000; // Convert to ms
+                const progress = Math.min(elapsed / coordDuration, 1);
+                
+                // Interpolate position
+                const lat = coord.location.latitude + (nextCoord.location.latitude - coord.location.latitude) * progress;
+                const lng = coord.location.longitude + (nextCoord.location.longitude - coord.location.longitude) * progress;
+                
+                currentMarker.setLatLng([lat, lng]);
+                
+                // Update timeline
+                const trackProgress = (coord.timestamp - trackData.track.start_time + (nextCoord.timestamp - coord.timestamp) * progress);
+                const percentage = (trackProgress / trackData.track.duration) * 100;
+                document.getElementById('timeline-slider').value = percentage;
+                document.getElementById('current-time').textContent = formatTime(trackProgress);
+                
+                if (progress >= 1) {
+                    currentIndex++;
+                    // Continue animation with next segment by calling animateTrack again
+                    animateTrack();
+                    return;
+                }
+                
+                animationId = requestAnimationFrame(animate);
+            }
+            
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function updateTrackPosition(trackTime) {
+            // Find the coordinate at the given track time
+            const targetTimestamp = trackData.track.start_time + trackTime;
+            
+            for (let i = 0; i < trackData.coordinates.length - 1; i++) {
+                const coord = trackData.coordinates[i];
+                const nextCoord = trackData.coordinates[i + 1];
+                
+                if (targetTimestamp >= coord.timestamp && targetTimestamp <= nextCoord.timestamp) {
+                    const progress = (targetTimestamp - coord.timestamp) / (nextCoord.timestamp - coord.timestamp);
+                    const lat = coord.location.latitude + (nextCoord.location.latitude - coord.location.latitude) * progress;
+                    const lng = coord.location.longitude + (nextCoord.location.longitude - coord.location.longitude) * progress;
+                    
+                    currentMarker.setLatLng([lat, lng]);
+                    currentIndex = i;
+                    
+                    // Update timeline display
+                    const percentage = (trackTime / trackData.track.duration) * 100;
+                    document.getElementById('timeline-slider').value = percentage;
+                    document.getElementById('current-time').textContent = formatTime(trackTime);
+                    break;
+                }
+            }
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initializeViewer);
+    </script>
+</body>
+</html>

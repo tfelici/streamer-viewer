@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streamer Viewer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Streamer Viewer</h1>
+            <p>GPS Tracks and Video Recordings</p>
+        </header>
+
+        <main>
+            <div class="section">
+                <h2>GPS Tracks</h2>
+                {% if tracks %}
+                    <div class="track-list">
+                        {% for track in tracks %}
+                            <div class="track-item">
+                                <div class="track-info">
+                                    <h3>{{ track.track_id }}</h3>
+                                    <div class="track-details">
+                                        <span><strong>Created:</strong> {{ track.created | datetimeformat }}</span>
+                                        <span><strong>Duration:</strong> {{ track.duration | durationformat }}</span>
+                                        <span><strong>Coordinates:</strong> {{ track.coord_count }}</span>
+                                        <span><strong>Size:</strong> {{ track.size | filesizeformat }}</span>
+                                    </div>
+                                </div>
+                                <div class="track-actions">
+                                    <a href="{{ url_for('view_track', track_id=track.track_id) }}" class="btn btn-primary">View Track</a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="no-data">No GPS tracks found. Make sure tracks are available in streamerData/tracks/</p>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>
