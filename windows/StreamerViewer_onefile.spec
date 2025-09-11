@@ -84,11 +84,11 @@ splash = Splash(
     '../splash.png',
     binaries=a.binaries,
     datas=a.datas,
-    text_pos=(230, 260),
-    text_size=12,
+    text_pos=(10, 300),
+    text_size=14,
     text_color='white',
-    text_default='Loading Streamer Viewer...',
-    minify_script=True
+    minify_script=True,
+    always_on_top=True,
 )
 
 exe = EXE(
