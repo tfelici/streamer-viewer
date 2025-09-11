@@ -17,6 +17,13 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify, Response, send_file
 import csv
 
+# Splash screen support
+try:
+    import pyi_splash
+    SPLASH_AVAILABLE = True
+except ImportError:
+    SPLASH_AVAILABLE = False
+
 # Add the current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -338,25 +345,27 @@ def start_flask_server(port):
 
 def main():
     """Main function to start the application"""
-    # Close splash screen if running as executable
-    try:
-        import pyi_splash
-        pyi_splash.update_text('🚀 Starting Streamer Viewer...')
-        time.sleep(0.5)
-    except ImportError:
-        pass
-    
     print("Starting Streamer Viewer...")
+    
+    # Update splash screen if available
+    if SPLASH_AVAILABLE:
+        try:
+            pyi_splash.update_text("🚀 Starting Streamer Viewer...")
+            time.sleep(0.5)
+        except Exception as e:
+            print(f"Splash screen update error: {e}")
+    
     print(f"Using streamer data directory: {STREAMER_DATA_DIR}")
     
-    # Check if data directories exist
-    try:
-        if 'pyi_splash' in sys.modules:
-            pyi_splash.update_text('📁 Checking data directories...')
+    # Update splash screen if available
+    if SPLASH_AVAILABLE:
+        try:
+            pyi_splash.update_text("📁 Checking data directories...")
             time.sleep(0.3)
-    except:
-        pass
+        except Exception as e:
+            print(f"Splash screen update error: {e}")
         
+    # Check if data directories exist        
     if not os.path.exists(STREAMER_DATA_DIR):
         print(f"Warning: Streamer data directory not found: {STREAMER_DATA_DIR}")
     if not os.path.exists(TRACKS_DIR):
@@ -365,61 +374,66 @@ def main():
         print(f"Warning: Recordings directory not found: {RECORDINGS_DIR}")
     
     # Find available port
-    try:
-        if 'pyi_splash' in sys.modules:
-            pyi_splash.update_text('🌐 Finding available port...')
+    if SPLASH_AVAILABLE:
+        try:
+            pyi_splash.update_text("🌐 Finding available port...")
             time.sleep(0.3)
-    except:
-        pass
+        except Exception as e:
+            print(f"Splash screen update error: {e}")
         
     port = find_available_port()
     if not port:
         print("No available ports found!")
+        if SPLASH_AVAILABLE:
+            try:
+                pyi_splash.close()
+            except:
+                pass
         return
     
     print(f"Starting server on port {port}...")
     
-    # Update splash
-    try:
-        if 'pyi_splash' in sys.modules:
-            pyi_splash.update_text('⚡ Starting web server...')
+    if SPLASH_AVAILABLE:
+        try:
+            pyi_splash.update_text(f"⚡ Starting web server on port {port}...")
             time.sleep(0.4)
-    except:
-        pass
+        except Exception as e:
+            print(f"Splash screen update error: {e}")
     
     # Start Flask server in background thread
     server_thread = threading.Thread(target=start_flask_server, args=(port,))
     server_thread.daemon = True
     server_thread.start()
     
+    if SPLASH_AVAILABLE:
+        try:
+            pyi_splash.update_text("🎯 Initializing web interface...")
+            time.sleep(0.4)
+            pyi_splash.update_text("🗺️ Loading GPS components...")
+            time.sleep(0.3)
+            pyi_splash.update_text("🎥 Preparing video player...")
+            time.sleep(0.3)
+            pyi_splash.update_text("✨ Almost ready...")
+            time.sleep(0.4)
+        except Exception as e:
+            print(f"Splash screen update error: {e}")
+    
     # Wait a moment for server to start
-    try:
-        if 'pyi_splash' in sys.modules:
-            pyi_splash.update_text('🎯 Initializing web interface...')
-            time.sleep(0.4)
-            pyi_splash.update_text('🗺️ Loading GPS components...')
+    time.sleep(0.5)
+    
+    if SPLASH_AVAILABLE:
+        try:
+            pyi_splash.update_text("✅ Ready! Opening window...")
             time.sleep(0.3)
-            pyi_splash.update_text('🎥 Preparing video player...')
-            time.sleep(0.3)
-            pyi_splash.update_text('✨ Almost ready...')
-            time.sleep(0.4)
-    except:
-        pass
-        
-    time.sleep(0.5)  # Extra time for server initialization
+            pyi_splash.close()
+        except Exception as e:
+            print(f"Splash screen close error: {e}")
     
     # Create webview window
     window_title = "Streamer Viewer"
     window_url = f"http://127.0.0.1:{port}"
     
     print(f"Opening web viewer: {window_url}")
-    
-    # Close splash screen before opening main window
-    try:
-        if 'pyi_splash' in sys.modules:
-            pyi_splash.close()
-    except:
-        pass
     
     # Create and start webview
     webview.create_window(

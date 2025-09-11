@@ -11,16 +11,16 @@ pip install -r requirements.txt
 REM Build the executable
 echo Building executable...
 cd windows
-pyinstaller StreamerViewer_onefile.spec --clean
+python -m PyInstaller StreamerViewer_onefile.spec --clean
 
 REM Check if build was successful
-if exist "dist\StreamerViewer_Standalone.exe" (
+if exist "dist\StreamerViewer.exe" (
     echo.
     echo ================================
     echo Build completed successfully!
     echo ================================
     echo.
-    echo Executable location: windows\dist\StreamerViewer_Standalone.exe
+    echo Executable location: windows\dist\StreamerViewer.exe
     echo.
     echo You can now run the standalone executable without Python installed.
     echo.
