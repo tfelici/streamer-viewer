@@ -101,32 +101,52 @@ def get_track_files():
     return tracks
 
 def get_video_files():
-    """Get list of video recording files"""
+    """Get list of video recording files from hierarchical directory structure"""
     videos = []
-    if os.path.exists(RECORDINGS_DIR):
-        video_files = glob.glob(os.path.join(RECORDINGS_DIR, '*.mp4'))
-        for video_file in video_files:
-            try:
-                # Extract timestamp from filename (format: timestamp.mp4)
-                filename = os.path.basename(video_file)
-                match = re.match(r'^(\d+)\.mp4$', filename)
-                if match:
-                    timestamp = int(match.group(1))
-                    
-                    # Get file stats
-                    stat = os.stat(video_file)
-                    size = stat.st_size
-                    
-                    videos.append({
-                        'filename': filename,
-                        'filepath': video_file,
-                        'timestamp': timestamp,
-                        'datetime': datetime.fromtimestamp(timestamp),
-                        'size': size
-                    })
-            except Exception as e:
-                print(f"Error processing video file {video_file}: {e}")
+    
+    if not os.path.exists(RECORDINGS_DIR):
+        return videos
+    
+    # Walk through hierarchical structure: domain/rtmpkey/files
+    for domain in os.listdir(RECORDINGS_DIR):
+        domain_path = os.path.join(RECORDINGS_DIR, domain)
+        if not os.path.isdir(domain_path):
+            continue
+            
+        for rtmpkey in os.listdir(domain_path):
+            rtmpkey_path = os.path.join(domain_path, rtmpkey)
+            if not os.path.isdir(rtmpkey_path):
                 continue
+                
+            # Get all mp4 files in this rtmpkey directory
+            for filename in os.listdir(rtmpkey_path):
+                if filename.endswith('.mp4'):
+                    video_file = os.path.join(rtmpkey_path, filename)
+                    try:
+                        # Extract timestamp from filename (format: timestamp.mp4)
+                        match = re.match(r'^(\d+)\.mp4$', filename)
+                        if match:
+                            timestamp = int(match.group(1))
+                            
+                            # Get file stats
+                            stat = os.stat(video_file)
+                            size = stat.st_size
+                            
+                            # Create display name with domain/rtmpkey context
+                            display_name = f"{domain}/{rtmpkey}/{filename}"
+                            
+                            videos.append({
+                                'filename': display_name,
+                                'filepath': video_file,
+                                'timestamp': timestamp,
+                                'datetime': datetime.fromtimestamp(timestamp),
+                                'size': size,
+                                'domain': domain,
+                                'rtmpkey': rtmpkey
+                            })
+                    except Exception as e:
+                        print(f"Error processing video file {video_file}: {e}")
+                        continue
     
     # Sort by timestamp, newest first
     videos.sort(key=lambda x: x['timestamp'], reverse=True)
@@ -313,11 +333,12 @@ def api_track_data(track_id):
         'coordinates': coordinates
     })
 
-@app.route('/video/<filename>')
+@app.route('/video/<path:filename>')
 def serve_video(filename):
-    """Serve video files"""
+    """Serve video files from hierarchical directory structure"""
+    # Handle paths like "domain/rtmpkey/timestamp.mp4"
     video_path = os.path.join(RECORDINGS_DIR, filename)
-    if os.path.exists(video_path):
+    if os.path.exists(video_path) and video_path.startswith(RECORDINGS_DIR):
         return send_file(video_path)
     else:
         return "Video not found", 404
