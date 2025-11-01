@@ -27,15 +27,18 @@
             
             <div class="splitter" id="splitter"></div>
             
-            {% if video %}
+            {% if videos and videos|length > 0 %}
             <div class="video-container">
                 <video id="video-player" controls>
-                    <source src="{{ url_for('serve_video', filename=video.filename) }}" type="video/mp4">
+                    <source id="video-source" src="{{ url_for('serve_video', filename=videos[0].filename) }}" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
                 <div class="video-info">
-                    <span>Video: {{ video.filename }}</span>
-                    <span>Recorded: {{ video.datetime | datetimeformat }}</span>
+                    <span id="current-video-name">Video: {{ videos[0].filename }}</span>
+                    <span id="current-video-time">Recorded: {{ videos[0].datetime | datetimeformat }}</span>
+                    {% if videos|length > 1 %}
+                    <span id="video-segment-info">Segment 1 of {{ videos|length }}</span>
+                    {% endif %}
                 </div>
             </div>
             {% else %}
@@ -60,12 +63,11 @@
                 <button id="reset-btn" class="btn btn-secondary">Reset</button>
                 <label for="speed-select">Speed:</label>
                 <select id="speed-select">
-                    <option value="0.25">0.25x</option>
-                    <option value="0.5">0.5x</option>
                     <option value="1" selected>1x</option>
                     <option value="2">2x</option>
                     <option value="4">4x</option>
                     <option value="8">8x</option>
+                    <option value="16">16x</option>
                 </select>
             </div>
         </div>
@@ -76,7 +78,7 @@
         const trackData = {
             track: {{ track | tojson }},
             coordinates: {{ coordinates | tojson }},
-            video: {{ video | tojson if video else 'null' }}
+            videos: {{ videos | tojson if videos else '[]' }}
         };
 
         let map;
@@ -84,17 +86,21 @@
         let currentMarker;
         let isPlaying = false;
         let currentIndex = 0;
+        let currentProgress = 0; // Track progress within current coordinate pair
         let animationId;
         let playbackSpeed = 1;
         let videoPlayer;
-        let videoStartTime = null;
+        let currentVideoIndex = 0;
+        let currentVideoStartTime = null;
+        let isUserScrubbing = false;
+        let isUpdatingVideoState = false; // Prevent circular events
 
         // Initialize the map and track viewer
         function initializeViewer() {
             initializeMap();
             initializeControls();
             initializeSplitter();
-            if (trackData.video) {
+            if (trackData.videos && trackData.videos.length > 0) {
                 initializeVideo();
             }
             drawTrack();
@@ -171,19 +177,261 @@
 
         function initializeVideo() {
             videoPlayer = document.getElementById('video-player');
-            if (videoPlayer && trackData.video) {
-                // Calculate video start time relative to track
-                videoStartTime = trackData.video.timestamp - trackData.track.start_time;
+            if (videoPlayer && trackData.videos && trackData.videos.length > 0) {
+                // Start with the first video
+                setCurrentVideo(0);
+                
+                // Set initial playback rate
+                videoPlayer.playbackRate = playbackSpeed;
                 
                 // Sync video with timeline
                 videoPlayer.addEventListener('timeupdate', function() {
-                    if (!isPlaying) {
+                    // Only sync when paused and user is not scrubbing
+                    // During play mode, let the animation handle timeline updates
+                    if (!isPlaying && !isUserScrubbing) {
                         const videoTime = videoPlayer.currentTime;
-                        const trackTime = videoStartTime + videoTime;
+                        const trackTime = currentVideoStartTime + videoTime;
+                        
+                        // Update timeline slider and time display
+                        const percentage = (trackTime / trackData.track.duration) * 100;
+                        document.getElementById('timeline-slider').value = percentage;
+                        document.getElementById('current-time').textContent = formatTime(trackTime);
+                        
+                        // Update track position
                         updateTrackPosition(trackTime);
                     }
                 });
+
+                // Handle video seeking (when user scrubs video controls)
+                videoPlayer.addEventListener('seeked', function() {
+                    const videoTime = videoPlayer.currentTime;
+                    const trackTime = currentVideoStartTime + videoTime;
+                    
+                    // Update main timeline and track position
+                    const percentage = (trackTime / trackData.track.duration) * 100;
+                    document.getElementById('timeline-slider').value = percentage;
+                    document.getElementById('current-time').textContent = formatTime(trackTime);
+                    updateTrackPosition(trackTime);
+                    
+                    // If playing, restart animation from new position
+                    if (isPlaying) {
+                        // Cancel current animation
+                        if (animationId) {
+                            cancelAnimationFrame(animationId);
+                        }
+                        // Restart animation from new position
+                        animateTrack();
+                    }
+                });
+
+                // Handle video play event (when user clicks play on video controls)
+                videoPlayer.addEventListener('play', function() {
+                    if (!isPlaying && !isUpdatingVideoState) {
+
+                        isUpdatingVideoState = true;
+                        startPlayback();
+                        isUpdatingVideoState = false;
+                    }
+                });
+
+                // Handle video pause event (when user clicks pause on video controls)
+                videoPlayer.addEventListener('pause', function() {
+                    // Only pause the main timeline if:
+                    // 1. Timeline is currently playing
+                    // 2. We're not in the middle of updating video state (switching videos, etc.)
+                    // 3. The video hasn't reached its end (which would cause automatic pause)
+                    // 4. We're not in a gap (currentVideoIndex >= 0)
+                    if (isPlaying && !isUpdatingVideoState && currentVideoIndex >= 0) {
+                        // Check if this is a legitimate user pause vs automatic end-of-video pause
+                        const currentTime = videoPlayer.currentTime || 0;
+                        const duration = videoPlayer.duration || 0;
+                        const isNearEnd = duration > 0 && (currentTime >= duration - 0.5); // Within 0.5 seconds of end
+                        
+                        if (!isNearEnd) {
+
+                            isUpdatingVideoState = true;
+                            pausePlayback();
+                            isUpdatingVideoState = false;
+                        } else {
+
+                        }
+                    }
+                });
+
+                // Handle video ended event
+                videoPlayer.addEventListener('ended', function() {
+
+                    // Don't do anything here - let the timeline animation handle video switching
+                    // based on track position, not video end events
+                });
             }
+        }
+
+        function showNoVideo(message = "No video available for this time period") {
+            // Hide current video and show placeholder, but DON'T pause or affect play state
+            if (videoPlayer) {
+                videoPlayer.style.display = 'none';
+                // Don't pause the video - let the timeline continue independently
+            }
+            
+            // Update display elements to show gap status
+            const videoNameSpan = document.getElementById('current-video-name');
+            const videoTimeSpan = document.getElementById('current-video-time');
+            const segmentInfo = document.getElementById('video-segment-info');
+            
+            if (videoNameSpan) videoNameSpan.textContent = message;
+            if (videoTimeSpan) videoTimeSpan.textContent = '';
+            if (segmentInfo) {
+                segmentInfo.innerHTML = '<span style="color: #888; font-style: italic;">Timeline gap - no video available</span>';
+            }
+            
+            currentVideoIndex = -2; // Use -2 consistently for gaps
+
+        }
+
+        function setCurrentVideo(videoIndex, preservePlaybackState = false) {
+            // Handle special case for gaps between videos
+            if (videoIndex === -2) {
+                showNoVideo("Gap between video segments");
+                return;
+            }
+            
+            if (!trackData.videos || videoIndex < 0 || videoIndex >= trackData.videos.length) {
+                if (videoIndex === -1) {
+                    showNoVideo("No video files available");
+                }
+                return;
+            }
+
+            const wasPlaying = videoPlayer && !videoPlayer.paused;
+            const previousVideoIndex = currentVideoIndex;
+            
+            currentVideoIndex = videoIndex;
+            const video = trackData.videos[videoIndex];
+            
+            // Calculate video start time relative to track
+            currentVideoStartTime = video.timestamp - trackData.track.start_time;
+            
+            // Ensure video player is visible when switching to a valid video
+            if (videoPlayer) {
+                videoPlayer.style.display = 'block';
+            }
+            
+            // Update video source
+            const videoSource = document.getElementById('video-source');
+            const videoNameSpan = document.getElementById('current-video-name');
+            const videoTimeSpan = document.getElementById('current-video-time');
+            const segmentInfo = document.getElementById('video-segment-info');
+            
+            if (videoSource && previousVideoIndex !== videoIndex) {
+                videoSource.src = `/video/${video.filename}`;
+                
+                // Handle video loading with proper event handling
+                const handleVideoLoad = () => {
+                    // Set the correct playback rate for the new video
+                    videoPlayer.playbackRate = playbackSpeed;
+                    
+                    if (preservePlaybackState && wasPlaying && isPlaying) {
+
+                        videoPlayer.play().catch(e => {
+                            console.log('Auto-play prevented:', e);
+
+                        });
+                    }
+                    videoPlayer.removeEventListener('loadeddata', handleVideoLoad);
+                };
+                
+                videoPlayer.addEventListener('loadeddata', handleVideoLoad);
+                videoPlayer.load();
+            }
+            
+            if (videoNameSpan) {
+                videoNameSpan.textContent = `Video: ${video.filename}`;
+            }
+            
+            if (videoTimeSpan) {
+                const videoDate = new Date(video.timestamp * 1000);
+                videoTimeSpan.textContent = `Recorded: ${videoDate.toLocaleString()}`;
+            }
+            
+            if (segmentInfo && trackData.videos.length > 1) {
+                segmentInfo.textContent = `Segment ${videoIndex + 1} of ${trackData.videos.length}`;
+            }
+        }
+
+        function findBestVideoForTime(trackTime) {
+            if (!trackData.videos || trackData.videos.length === 0) {
+                return -1;
+            }
+
+            const targetTimestamp = trackData.track.start_time + trackTime;
+            
+            // Find the video that contains this timestamp using video durations
+            for (let i = 0; i < trackData.videos.length; i++) {
+                const video = trackData.videos[i];
+                const videoStartTime = video.timestamp - trackData.track.start_time;
+                
+                // Use video end_time if available, otherwise use duration
+                let videoEndTime;
+                if (video.end_time) {
+                    videoEndTime = video.end_time - trackData.track.start_time;
+                } else if (video.duration) {
+                    videoEndTime = videoStartTime + video.duration;
+                } else {
+                    // Fallback: assume video ends when next video starts
+                    const nextVideo = trackData.videos[i + 1];
+                    if (nextVideo) {
+                        videoEndTime = nextVideo.timestamp - trackData.track.start_time;
+                    } else {
+                        // Last video - assume it covers rest of track
+                        videoEndTime = trackData.track.duration;
+                    }
+                }
+                
+                // Check if trackTime falls within this video's timespan
+                if (trackTime >= videoStartTime && trackTime <= videoEndTime) {
+                    return i;
+                }
+            }
+            
+            // Check if we're in a gap between videos
+            for (let i = 0; i < trackData.videos.length - 1; i++) {
+                const currentVideo = trackData.videos[i];
+                const nextVideo = trackData.videos[i + 1];
+                
+                const currentVideoStartTime = currentVideo.timestamp - trackData.track.start_time;
+                const nextVideoStartTime = nextVideo.timestamp - trackData.track.start_time;
+                
+                // Calculate current video end time
+                let currentVideoEndTime;
+                if (currentVideo.end_time) {
+                    currentVideoEndTime = currentVideo.end_time - trackData.track.start_time;
+                } else if (currentVideo.duration) {
+                    currentVideoEndTime = currentVideoStartTime + currentVideo.duration;
+                } else {
+                    currentVideoEndTime = nextVideoStartTime; // No gap if no duration info
+                }
+                
+                // Check if we're in the gap between current and next video
+                if (trackTime > currentVideoEndTime && trackTime < nextVideoStartTime) {
+                    return -2; // Special value indicating gap between videos
+                }
+            }
+            
+            // If no video contains the time and we're not in a gap, find the closest one
+            let closestIndex = 0;
+            let closestDistance = Math.abs((trackData.videos[0].timestamp - trackData.track.start_time) - trackTime);
+            
+            for (let i = 1; i < trackData.videos.length; i++) {
+                const videoStartTime = trackData.videos[i].timestamp - trackData.track.start_time;
+                const distance = Math.abs(videoStartTime - trackTime);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestIndex = i;
+                }
+            }
+            
+            return closestIndex;
         }
 
         function initializeControls() {
@@ -196,18 +444,86 @@
             resetBtn.addEventListener('click', resetPlayback);
             speedSelect.addEventListener('change', function() {
                 playbackSpeed = parseFloat(this.value);
-            });
+                
+                // Update video playback rate to match animation speed
+                if (videoPlayer) {
+                    videoPlayer.playbackRate = playbackSpeed;
 
+                }
+            });
+            
+            timelineSlider.addEventListener('mousedown', function() {
+                isUserScrubbing = true;
+
+                // Pause animation during scrubbing but remember play state
+                if (isPlaying && animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+            });
+            
+            timelineSlider.addEventListener('mouseup', function() {
+                isUserScrubbing = false;
+
+                // Resume animation if we were playing
+                if (isPlaying) {
+                    animateTrack();
+                }
+            });
+            
             timelineSlider.addEventListener('input', function() {
+                
                 const percentage = this.value / 100;
                 const trackTime = trackData.track.duration * percentage;
                 updateTrackPosition(trackTime);
                 
-                // Update video position if available
-                if (videoPlayer && trackData.video) {
-                    const videoTime = trackTime - videoStartTime;
-                    if (videoTime >= 0 && videoTime <= videoPlayer.duration) {
-                        videoPlayer.currentTime = videoTime;
+                // Switch to appropriate video seamlessly and update position
+                if (videoPlayer && trackData.videos && trackData.videos.length > 0) {
+                    const wasPlaying = !videoPlayer.paused;
+                    const bestVideoIndex = findBestVideoForTime(trackTime);
+                    
+                    if (bestVideoIndex !== currentVideoIndex) {
+                        setCurrentVideo(bestVideoIndex, true);
+                        
+                        // Wait for video to load then set correct position
+                        const updateVideoPosition = () => {
+                            const videoTime = trackTime - currentVideoStartTime;
+                            if (videoTime >= 0 && videoPlayer.duration && videoTime <= videoPlayer.duration) {
+                                videoPlayer.currentTime = videoTime;
+                                
+                                // Maintain play state during scrubbing
+                                if (wasPlaying && isUserScrubbing) {
+                                    videoPlayer.play();
+                                } else if (isPlaying && !isUserScrubbing) {
+                                    videoPlayer.play();
+                                } else {
+                                    videoPlayer.pause();
+                                }
+                            }
+                            videoPlayer.removeEventListener('loadeddata', updateVideoPosition);
+                        };
+                        
+                        if (videoPlayer.readyState >= 2) {
+                            // Video already loaded
+                            updateVideoPosition();
+                        } else {
+                            // Wait for video to load
+                            videoPlayer.addEventListener('loadeddata', updateVideoPosition);
+                        }
+                    } else {
+                        // Same video, just update position
+                        const videoTime = trackTime - currentVideoStartTime;
+                        if (videoTime >= 0 && videoPlayer.duration && videoTime <= videoPlayer.duration) {
+                            videoPlayer.currentTime = videoTime;
+                            
+                            // Maintain play state during scrubbing
+                            if (wasPlaying && isUserScrubbing) {
+                                videoPlayer.play();
+                            } else if (isPlaying && !isUserScrubbing) {
+                                videoPlayer.play();
+                            } else {
+                                videoPlayer.pause();
+                            }
+                        }
                     }
                 }
             });
@@ -259,32 +575,46 @@
         }
 
         function startPlayback() {
+            if (isPlaying) return; // Already playing
+            
             isPlaying = true;
             document.getElementById('play-pause-btn').textContent = 'Pause';
-            
-            if (videoPlayer) {
-                videoPlayer.play();
-            }
-            
+
+            // Don't recalculate currentIndex - it should already be set correctly by updateTrackPosition
+            // Start animation regardless of video state
             animateTrack();
+            
+            // Try to play video if we have a valid one
+            if (videoPlayer && currentVideoIndex >= 0) {
+                videoPlayer.playbackRate = playbackSpeed;
+                videoPlayer.play().catch(e => {
+                    console.log('Video play failed:', e);
+                });
+            }
         }
 
         function pausePlayback() {
+            if (!isPlaying) return; // Already paused
+            
             isPlaying = false;
             document.getElementById('play-pause-btn').textContent = 'Play';
-            
-            if (videoPlayer) {
+
+            // Pause video if we have one
+            if (videoPlayer && currentVideoIndex >= 0) {
                 videoPlayer.pause();
             }
             
+            // Stop animation
             if (animationId) {
                 cancelAnimationFrame(animationId);
+                animationId = null;
             }
         }
 
         function resetPlayback() {
             pausePlayback();
             currentIndex = 0;
+            currentProgress = 0; // Reset progress to beginning
             document.getElementById('timeline-slider').value = 0;
             document.getElementById('current-time').textContent = '00:00';
             
@@ -300,28 +630,45 @@
 
         function animateTrack() {
             if (!isPlaying) return;
+
+            // Check bounds first
+            if (currentIndex >= trackData.coordinates.length - 1) {
+                pausePlayback();
+                return;
+            }
             
-            const startTime = performance.now();
+            // Get coordinate info for timing calculation
+            let coord = trackData.coordinates[currentIndex];
+            let nextCoord = trackData.coordinates[currentIndex + 1];
+            
+            if (!coord || !nextCoord) {
+                pausePlayback();
+                return;
+            }
+            
+            let coordDuration = Math.max((nextCoord.timestamp - coord.timestamp) * 1000, 100); // Convert to ms, minimum 100ms
+            
+            // Adjust start time to account for current progress
+            let startTime = performance.now() - (currentProgress * coordDuration / playbackSpeed);
             
             function animate(currentTime) {
                 if (!isPlaying) return;
                 
+                // Don't animate while user is scrubbing, but don't stop completely
+                if (isUserScrubbing) {
+
+                    animationId = requestAnimationFrame(animate);
+                    return;
+                }
+
                 // Check if we've reached the end of the track
                 if (currentIndex >= trackData.coordinates.length - 1) {
                     pausePlayback();
                     return;
                 }
                 
+                // Use the same coord info from the outer scope
                 const elapsed = (currentTime - startTime) * playbackSpeed;
-                const coord = trackData.coordinates[currentIndex];
-                const nextCoord = trackData.coordinates[currentIndex + 1];
-                
-                if (!nextCoord) {
-                    pausePlayback();
-                    return;
-                }
-                
-                const coordDuration = (nextCoord.timestamp - coord.timestamp) * 1000; // Convert to ms
                 const progress = Math.min(elapsed / coordDuration, 1);
                 
                 // Interpolate position
@@ -330,17 +677,96 @@
                 
                 currentMarker.setLatLng([lat, lng]);
                 
-                // Update timeline
+                // Update timeline during playback (unless user is actively scrubbing)
                 const trackProgress = (coord.timestamp - trackData.track.start_time + (nextCoord.timestamp - coord.timestamp) * progress);
-                const percentage = (trackProgress / trackData.track.duration) * 100;
-                document.getElementById('timeline-slider').value = percentage;
-                document.getElementById('current-time').textContent = formatTime(trackProgress);
+
+                if (!isUserScrubbing) {
+                    const percentage = (trackProgress / trackData.track.duration) * 100;
+                    const timelineSlider = document.getElementById('timeline-slider');
+                    const currentTime = document.getElementById('current-time');
+                    
+                    if (timelineSlider && currentTime) {
+                        timelineSlider.value = percentage;
+                        currentTime.textContent = formatTime(trackProgress);
+                    }
+                }
+                
+                // Check if we need to switch video segments during playback
+                if (trackData.videos && trackData.videos.length > 0) {
+                    const bestVideoIndex = findBestVideoForTime(trackProgress);
+                    
+                    // Only show transition info when there's an actual change
+                    if (bestVideoIndex !== currentVideoIndex) {
+                        if (bestVideoIndex === -2) {
+                            setCurrentVideo(bestVideoIndex, false); // Show no video state
+                        } else if (bestVideoIndex >= 0) {
+                            const wasInGap = currentVideoIndex === -2;
+
+                            // Switch to the new video
+                            setCurrentVideo(bestVideoIndex, false); // Don't auto-play yet
+                            
+                            // If we're currently playing and have a valid video, start it
+                            if (isPlaying && videoPlayer) {
+                                const videoTime = trackProgress - currentVideoStartTime;
+                                if (videoTime >= 0) {
+                                    videoPlayer.currentTime = Math.max(0, videoTime);
+                                    videoPlayer.playbackRate = playbackSpeed;
+                                    videoPlayer.play().catch(e => {
+                                        console.log('Video play failed during switch:', e);
+                                    });
+                                }
+                            }
+                        }
+                    } else {
+                        // No video change - just show current state
+                        let statusText = "";
+                        if (bestVideoIndex === -2) {
+                            statusText = `In gap at ${formatTime(trackProgress)}`;
+                        } else if (bestVideoIndex >= 0) {
+                            statusText = `Playing video ${bestVideoIndex}`;
+                        } else {
+                            statusText = `No video available`;
+                        }
+
+                        // Sync video position with track progress for valid videos only
+                        if (bestVideoIndex >= 0 && videoPlayer) {
+                            const videoTime = trackProgress - currentVideoStartTime;
+                            if (videoTime >= 0 && videoPlayer.duration && videoTime <= videoPlayer.duration) {
+                                // Only sync if the video position drifts too much from expected position
+                                const currentVideoTime = videoPlayer.currentTime || 0;
+                                const timeDrift = Math.abs(currentVideoTime - videoTime);
+                                if (timeDrift > 2.0) { // Allow 2 second drift tolerance
+                                    videoPlayer.currentTime = videoTime;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Update the current progress for pause/resume functionality
+                currentProgress = progress;
                 
                 if (progress >= 1) {
+                    // Move to next coordinate segment
                     currentIndex++;
-                    // Continue animation with next segment by calling animateTrack again
-                    animateTrack();
-                    return;
+                    currentProgress = 0; // Reset progress for next coordinate pair
+                    
+                    // Check if we've reached the end after incrementing
+                    if (currentIndex >= trackData.coordinates.length - 1) {
+                        pausePlayback();
+                        return;
+                    }
+
+                    // Continue with the same animation loop but update timing for new segment
+                    // Get new coordinate info for the next segment
+                    coord = trackData.coordinates[currentIndex];
+                    nextCoord = trackData.coordinates[currentIndex + 1];
+                    coordDuration = Math.max((nextCoord.timestamp - coord.timestamp) * 1000, 100);
+                    
+                    // Reset start time for the new segment
+                    startTime = performance.now();
+                    
+                    // Don't return - continue the animation loop seamlessly
                 }
                 
                 animationId = requestAnimationFrame(animate);
@@ -364,11 +790,33 @@
                     
                     currentMarker.setLatLng([lat, lng]);
                     currentIndex = i;
+                    currentProgress = progress; // Set the exact progress for pause/resume
                     
                     // Update timeline display
                     const percentage = (trackTime / trackData.track.duration) * 100;
                     document.getElementById('timeline-slider').value = percentage;
                     document.getElementById('current-time').textContent = formatTime(trackTime);
+
+                    
+                                        // Handle video switching during scrubbing - including gaps
+                    if (trackData.videos && trackData.videos.length > 0) {
+                        const bestVideoIndex = findBestVideoForTime(trackTime);
+                        if (bestVideoIndex !== currentVideoIndex) {
+                            if (bestVideoIndex === -2) {
+                                setCurrentVideo(bestVideoIndex); // Shows "no video" state
+                            } else if (bestVideoIndex >= 0) {
+                                setCurrentVideo(bestVideoIndex, false);
+                                
+                                // Set video position to match scrubbed time
+                                if (videoPlayer && currentVideoStartTime !== undefined) {
+                                    const videoTime = trackTime - currentVideoStartTime;
+                                    if (videoTime >= 0 && videoTime <= (videoPlayer.duration || 0)) {
+                                        videoPlayer.currentTime = videoTime;
+                                    }
+                                }
+                            }
+                        }
+                    }
                     break;
                 }
             }

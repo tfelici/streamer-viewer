@@ -84,6 +84,21 @@ header p {
     background-color: #7f8c8d;
 }
 
+.btn-danger {
+    background-color: #e74c3c;
+    color: white;
+    margin-left: 10px;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
+
+.btn-danger:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
 /* Track List */
 .track-list, .video-list {
     display: grid;
@@ -116,6 +131,12 @@ header p {
 
 .track-details span, .video-details span {
     white-space: nowrap;
+}
+
+.track-actions, .video-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .no-data {
@@ -212,9 +233,21 @@ header p {
     padding: 15px;
     background: #34495e;
     color: white;
-    display: flex;
-    justify-content: space-between;
     font-size: 0.9em;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: center;
+}
+
+.video-info span {
+    white-space: nowrap;
+}
+
+#video-segment-info {
+    color: #bdc3c7;
+    font-size: 0.85em;
+    font-style: italic;
 }
 
 .no-video {

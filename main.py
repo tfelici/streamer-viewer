@@ -10,12 +10,13 @@ import time
 import sys
 import os
 import socket
-import json
 import glob
 import re
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, Response, send_file
-import csv
+from flask import Flask, render_template, request, jsonify, send_file
+
+# Pure Python MP4 parsing
+import struct
 
 # Splash screen support
 try:
@@ -132,10 +133,16 @@ def get_video_files():
                             stat = os.stat(video_file)
                             size = stat.st_size
                             
+                            # Get video duration
+                            duration = get_video_duration_mediainfo(video_file)
+                            end_time = None
+                            if duration is not None:
+                                end_time = timestamp + duration
+                            
                             # Create display name with domain/rtmpkey context
                             display_name = f"{domain}/{rtmpkey}/{filename}"
                             
-                            videos.append({
+                            video_data = {
                                 'filename': display_name,
                                 'filepath': video_file,
                                 'timestamp': timestamp,
@@ -143,7 +150,14 @@ def get_video_files():
                                 'size': size,
                                 'domain': domain,
                                 'rtmpkey': rtmpkey
-                            })
+                            }
+                            
+                            # Only add duration and end_time if we successfully got them
+                            if duration is not None:
+                                video_data['duration'] = duration
+                                video_data['end_time'] = end_time
+                            
+                            videos.append(video_data)
                     except Exception as e:
                         print(f"Error processing video file {video_file}: {e}")
                         continue
@@ -197,33 +211,108 @@ def load_track_data(track_file):
     
     return coordinates
 
-def find_closest_video(track_start_time, track_end_time, videos):
-    """Find the video file that best matches the track timing"""
-    if not videos:
+def get_video_duration_mediainfo(path):
+    """Get video duration using pymediainfo library"""
+    try:
+        from pymediainfo import MediaInfo
+        media_info = MediaInfo.parse(path)
+        
+        # Try Video track first (most accurate for video files)
+        for track in media_info.tracks:
+            if track.track_type == 'Video' and track.duration:
+                return track.duration / 1000.0  # ms to seconds
+        
+        # Fallback to General track
+        for track in media_info.tracks:
+            if track.track_type == 'General' and track.duration:
+                return track.duration / 1000.0
+                
+    except ImportError:
+        print(f"Error: pymediainfo not available. Please install with: pip install pymediainfo")
+        return None
+    except Exception as e:
+        print(f"Error reading video duration for {path}: {e}")
         return None
     
-    best_match = None
-    best_score = float('inf')
+    return None
+
+def safe_remove_file(file_path):
+    """
+    Safely remove a file and ensure it's actually deleted from storage device.
+    
+    Args:
+        file_path (str): Path to the file to be removed
+        
+    Returns:
+        bool: True if file was successfully removed, False otherwise
+    """
+    try:
+        os.remove(file_path)
+        
+        # Force filesystem sync to ensure deletion is written to disk
+        try:
+            if os.name == 'nt':  # Windows
+                import ctypes
+                # Get the drive letter of the file path
+                drive = os.path.splitdrive(file_path)[0]
+                if drive:
+                    # Force flush of all cached writes for this drive
+                    handle = ctypes.windll.kernel32.CreateFileW(
+                        drive + "\\", 0x40000000, 3, None, 3, 0x02000000, None
+                    )
+                    if handle != -1:
+                        ctypes.windll.kernel32.FlushFileBuffers(handle)
+                        ctypes.windll.kernel32.CloseHandle(handle)
+            else:  # Unix-like systems
+                os.sync()
+        except Exception:
+            pass  # Ignore sync errors
+            
+        return True
+    except Exception as e:
+        print(f"Error removing file {file_path}: {e}")
+        return False
+
+
+
+def find_all_related_videos(track_start_time, track_end_time, videos):
+    """
+    Find all video files that temporally overlap with the track timing.
+    
+    Args:
+        track_start_time: Start timestamp of the track
+        track_end_time: End timestamp of the track
+        videos: List of video files with duration and end_time
+    
+    Returns:
+        List of video files that have temporal overlap with the track timespan
+    """
+    if not videos:
+        return []
+    
+    related_videos = []
     
     for video in videos:
-        video_timestamp = video['timestamp']
+        video_start = video['timestamp']
+        video_end = video.get('end_time')
         
-        # Calculate overlap or proximity score
-        if track_start_time <= video_timestamp <= track_end_time:
-            # Video starts during the track - perfect match
-            score = 0
-        else:
-            # Calculate distance from track time range
-            if video_timestamp < track_start_time:
-                score = track_start_time - video_timestamp
-            else:
-                score = video_timestamp - track_end_time
+        # Skip videos without duration/end_time information
+        if video_end is None:
+            continue
         
-        if score < best_score:
-            best_score = score
-            best_match = video
+        # Check for temporal overlap between video and track
+        # Two time ranges overlap if: max(start1, start2) < min(end1, end2)
+        overlap_start = max(track_start_time, video_start)
+        overlap_end = min(track_end_time, video_end)
+        
+        if overlap_start < overlap_end:
+            # There is an overlap
+            related_videos.append(video)
     
-    return best_match
+    # Sort by timestamp to return in chronological order
+    related_videos.sort(key=lambda x: x['timestamp'])
+    
+    return related_videos
 
 @app.template_filter('datetimeformat')
 def datetimeformat(value):
@@ -282,7 +371,7 @@ def index():
 
 @app.route('/view/<track_id>')
 def view_track(track_id):
-    """View specific track with synchronized video"""
+    """View specific track with synchronized multi-video playback"""
     tracks = get_track_files()
     videos = get_video_files()
     
@@ -302,13 +391,13 @@ def view_track(track_id):
     if not coordinates:
         return "No coordinate data found in track", 404
     
-    # Find matching video
-    video = find_closest_video(track['start_time'], track['end_time'], videos)
+    # Find all matching videos for this track
+    videos_for_track = find_all_related_videos(track['start_time'], track['end_time'], videos)
     
     return render_template('viewer.html',
                          track=track,
                          coordinates=coordinates,
-                         video=video)
+                         videos=videos_for_track)
 
 @app.route('/api/track/<track_id>')
 def api_track_data(track_id):
@@ -342,6 +431,84 @@ def serve_video(filename):
         return send_file(video_path)
     else:
         return "Video not found", 404
+
+@app.route('/delete-track', methods=['POST'])
+def delete_track():
+    """Delete a track and its corresponding video file"""
+    try:
+        data = request.get_json()
+        track_id = data.get('track_id')
+        
+        if not track_id:
+            return jsonify({'error': 'Track ID not provided'}), 400
+        
+        # Find the track
+        tracks = get_track_files()
+        track = None
+        for t in tracks:
+            if t['track_id'] == track_id:
+                track = t
+                break
+        
+        if not track:
+            return jsonify({'error': 'Track not found'}), 404
+        
+        # Delete the track file
+        track_deleted = False
+        if os.path.exists(track['filepath']):
+            if safe_remove_file(track['filepath']):
+                track_deleted = True
+            else:
+                return jsonify({'error': 'Failed to delete track file'}), 500
+        
+        # Find and delete all corresponding videos
+        videos = get_video_files()
+        videos_deleted = 0
+        videos_failed = 0
+        corresponding_videos = find_all_related_videos(track['start_time'], track['end_time'], videos)
+        
+        for video in corresponding_videos:
+            video_path = video['filepath']
+            if os.path.exists(video_path):
+                if safe_remove_file(video_path):
+                    videos_deleted += 1
+                else:
+                    videos_failed += 1
+        
+        # Handle partial failures
+        if videos_failed > 0 and videos_deleted == 0:
+            # Track was deleted but all videos failed
+            return jsonify({
+                'success': True,
+                'track_deleted': True,
+                'video_deleted': False,
+                'message': f'Track deleted successfully, but failed to delete {videos_failed} corresponding video file(s)'
+            })
+        elif videos_failed > 0:
+            # Track was deleted and some videos deleted, but some failed
+            return jsonify({
+                'success': True,
+                'track_deleted': True,
+                'video_deleted': True,
+                'message': f'Track deleted successfully along with {videos_deleted} video(s), but failed to delete {videos_failed} video file(s)'
+            })
+        
+        # All videos deleted successfully or no videos found
+        video_deleted = videos_deleted > 0
+        if videos_deleted > 0:
+            message = f'Track deleted successfully along with {videos_deleted} corresponding video(s)'
+        else:
+            message = 'Track deleted successfully (no corresponding videos found)'
+        
+        return jsonify({
+            'success': True,
+            'track_deleted': track_deleted,
+            'video_deleted': video_deleted,
+            'message': message
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to delete track: {str(e)}'}), 500
 
 # Web viewer functions
 def is_port_available(port):
