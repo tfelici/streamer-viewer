@@ -168,19 +168,48 @@ jobs:
         print('Windows spec file created successfully')
         "
 
-    - name: Create PyInstaller spec file (Linux with splash and GUI bundling)
+    - name: Install Python GTK packages for bundling
+      if: matrix.platform == 'linux'
+      run: |
+        # Install GTK packages via pip for better PyInstaller integration
+        pip install pycairo pygobject
+        # Also install qtpy for Qt support
+        pip install qtpy
+        
+    - name: Create PyInstaller spec file (Linux with aggressive GUI bundling)
       if: matrix.platform == 'linux'
       run: |
         python -c "
         import os
         spec_content = '''# -*- mode: python ; coding: utf-8 -*-
-        from PyInstaller.utils.hooks import collect_all, collect_submodules
+        from PyInstaller.utils.hooks import collect_all, collect_submodules, collect_data_files
 
-        # Collect all GTK, Cairo, and PyQt5 modules for self-contained executable
+        # Aggressive collection of all GUI-related modules and data
         gi_datas, gi_binaries, gi_hiddenimports = collect_all('gi')
         cairo_datas, cairo_binaries, cairo_hiddenimports = collect_all('cairo')
-        pyqt5_datas, pyqt5_binaries, pyqt5_hiddenimports = collect_all('PyQt5')
+        
+        # Try to collect PyQt5 if available, but don't fail if not
+        try:
+            pyqt5_datas, pyqt5_binaries, pyqt5_hiddenimports = collect_all('PyQt5')
+        except:
+            pyqt5_datas, pyqt5_binaries, pyqt5_hiddenimports = [], [], []
+            
+        # Collect system GTK libraries and typelibs
+        gtk_datas = collect_data_files('gi', include_py_files=False)
         gi_repo_hiddenimports = collect_submodules('gi.repository')
+        
+        # Additional GTK/GObject imports
+        additional_hiddenimports = [
+            'gi._gi',
+            'gi._gi_cairo', 
+            'gi.repository.GObject',
+            'gi.repository.Gio',
+            'gi.repository.GdkPixbuf',
+            'gi.repository.Pango',
+            'gi.repository.PangoCairo',
+            'cairo._cairo',
+            'pygtkcompat',
+        ]
 
         block_cipher = None
         
@@ -192,12 +221,12 @@ jobs:
                 ('templates', 'templates'),
                 ('static', 'static'),
                 ('splash.png', '.'),
-            ] + gi_datas + cairo_datas + pyqt5_datas,
+            ] + gi_datas + cairo_datas + pyqt5_datas + gtk_datas,
             hiddenimports=[
                 'webview',
                 'webview.platforms.winforms',
                 'webview.platforms.cef',
-                'webview.platforms.qt',
+                'webview.platforms.qt', 
                 'webview.platforms.gtk',
                 'pymediainfo',
                 'flask',
@@ -220,7 +249,7 @@ jobs:
                 'qtpy.QtCore',
                 'qtpy.QtGui',
                 'qtpy.QtWidgets',
-            ] + gi_hiddenimports + cairo_hiddenimports + pyqt5_hiddenimports + gi_repo_hiddenimports,
+            ] + gi_hiddenimports + cairo_hiddenimports + pyqt5_hiddenimports + gi_repo_hiddenimports + additional_hiddenimports,
             hookspath=[],
             hooksconfig={},
             runtime_hooks=[],
@@ -310,6 +339,22 @@ jobs:
         import shutil
         shutil.copy('dist/StreamerViewer', 'artifacts/StreamerViewer-linux')
         print('Linux executable copied to artifacts')
+        
+        # Create desktop entry for proper GNOME integration  
+        desktop_content = '[Desktop Entry]\\n'
+        desktop_content += 'Version=1.0\\n'
+        desktop_content += 'Type=Application\\n'
+        desktop_content += 'Name=Streamer Viewer\\n'
+        desktop_content += 'Comment=View and manage streaming recordings\\n'
+        desktop_content += 'Exec=./StreamerViewer-linux\\n'
+        desktop_content += 'Icon=application-default-icon\\n'
+        desktop_content += 'Terminal=false\\n'
+        desktop_content += 'Categories=AudioVideo;Video;\\n'
+        desktop_content += 'StartupNotify=true\\n'
+        
+        with open('artifacts/StreamerViewer.desktop', 'w') as f:
+            f.write(desktop_content)
+        print('Desktop entry created for GNOME integration')
         "
 
     - name: Prepare artifacts (macOS)
