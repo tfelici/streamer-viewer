@@ -55,21 +55,21 @@ jobs:
       run: |
         python -c "
         import sys
-        print('✅ Python version:', sys.version)
+        print('Python version:', sys.version)
         
         # Test individual imports
         try:
             import flask
-            print('✅ Flask imported')
+            print('SUCCESS: Flask imported')
         except Exception as e:
-            print(f'❌ Flask import failed: {e}')
+            print(f'ERROR: Flask import failed: {e}')
             sys.exit(1)
             
         try:
             import requests
-            print('✅ Requests imported')
+            print('SUCCESS: Requests imported')
         except Exception as e:
-            print(f'❌ Requests import failed: {e}')
+            print(f'ERROR: Requests import failed: {e}')
             sys.exit(1)
         "
 
@@ -81,14 +81,14 @@ jobs:
         
         # Check if main.py exists and is readable
         if os.path.exists('main.py'):
-            print('✅ main.py file exists')
+            print('SUCCESS: main.py file exists')
             with open('main.py', 'r', encoding='utf-8') as f:
                 content = f.read()
                 if 'Flask' in content and 'webview' in content:
-                    print('✅ main.py contains expected imports')
+                    print('SUCCESS: main.py contains expected imports')
                 else:
-                    print('⚠️ main.py may be missing some imports')
+                    print('WARNING: main.py may be missing some imports')
         else:
-            print('❌ main.py not found')
+            print('ERROR: main.py not found')
             sys.exit(1)
         "
