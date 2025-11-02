@@ -87,6 +87,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install Flask requests requests-toolbelt Pillow pyinstaller
         pip install pywebview pymediainfo
+        # Install jaraco dependencies explicitly to fix pkg_resources issues
+        pip install jaraco.text jaraco.functools jaraco.collections importlib-metadata
 
     - name: Install GUI frameworks (macOS only - Windows uses webview native)
       if: matrix.platform == 'macos'
@@ -268,6 +270,15 @@ jobs:
                 'gi._gi',
                 'gi._gi_cairo',
                 'cairo',
+                # Fix setuptools/pkg_resources dependencies
+                'jaraco.text',
+                'jaraco.functools',
+                'jaraco.collections',
+                'importlib_metadata',
+                'packaging',
+                'packaging.version',
+                'packaging.specifiers',
+                'packaging.requirements',
             ] + gi_submodules,
             hookspath=['hooks'],
             hooksconfig={},
@@ -283,7 +294,6 @@ jobs:
                 'notebook',
                 'sphinx',
                 'pytest',
-                'setuptools',
                 'wx',
                 'kivy',
                 'PySide2',
