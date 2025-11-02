@@ -185,82 +185,115 @@ jobs:
         print('Windows spec file created successfully')
         "
 
-    - name: Install minimal Python GTK packages for bundling
+    - name: Install Python GTK packages for webview support
       if: matrix.platform == 'linux'
       run: |
-        # Use system packages for GTK to avoid compilation overhead
-        # This is more reliable and produces smaller executables
-        echo "Using system GTK packages - more reliable and smaller executables"
+        # Install essential packages for pywebview GTK support
+        # Use system packages where possible to avoid compilation issues
+        echo "Installing GTK support for pywebview..."
         
-        # Install minimal Qt support for fallback
-        pip install qtpy || echo "qtpy install failed, will use GTK only"
+        # Try to install pycairo via pip (usually works)
+        pip install pycairo || echo "pycairo pip install failed"
         
-    - name: Create PyInstaller spec file (Linux with selective GUI bundling)
+        # For pygobject, use system packages due to complex dependencies
+        # The system packages are already installed, just ensure python can find them
+        export PYTHONPATH="/usr/lib/python3/dist-packages:$PYTHONPATH"
+        
+    - name: Create PyInstaller spec file (Linux with targeted GTK bundling)
       if: matrix.platform == 'linux'
       run: |
+        # Create runtime hook for GTK library loading
+        mkdir -p hooks
+        cat > hooks/hook-gi.py << 'EOF'
+        # Runtime hook to help gi find system libraries
+        import os
+        import sys
+
+        # Add system library paths
+        gi_paths = [
+            '/usr/lib/python3/dist-packages',
+            '/usr/lib/python3.13/dist-packages', 
+            '/usr/local/lib/python3.13/dist-packages'
+        ]
+        
+        for path in gi_paths:
+            if path not in sys.path and os.path.exists(path):
+                sys.path.insert(0, path)
+        EOF
+        
         python -c "
         import os
         spec_content = '''# -*- mode: python ; coding: utf-8 -*-
-        # Selective bundling approach to minimize executable size
+        # Targeted GTK bundling for pywebview support while minimizing size
+        from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+        
+        # Collect only essential GTK modules needed by pywebview
+        gi_submodules = [
+            'gi.repository.Gtk',
+            'gi.repository.GLib', 
+            'gi.repository.GObject',
+            'gi.repository.Gdk',
+            'gi.repository.WebKit2',
+            'gi.repository.Gio',
+        ]
+        
+        # Collect GTK typelib data files (needed for gi.repository)
+        try:
+            gi_datas = collect_data_files('gi.repository', includes=['*.typelib'])
+        except:
+            gi_datas = []
         
         block_cipher = None
         
         a = Analysis(
             ['main.py'],
-            pathex=['.'],
+            pathex=[
+                '.', 
+                '/usr/lib/python3/dist-packages',
+                '/usr/lib/python3.13/dist-packages',
+                '/usr/local/lib/python3.13/dist-packages'
+            ],
             binaries=[],
             datas=[
                 ('templates', 'templates'),
                 ('static', 'static'),
                 ('splash.png', '.'),
-            ],
+            ] + gi_datas,
             hiddenimports=[
                 'webview',
                 'webview.platforms.gtk',
-                'webview.platforms.qt', 
                 'pymediainfo',
                 'flask',
                 'requests',
                 'pyi_splash',
-                # Essential GTK imports only
+                # Essential GTK imports for pywebview
                 'gi',
                 'gi.repository',
-                'gi.repository.Gtk',
-                'gi.repository.GLib',
-                'gi.repository.GObject',
-                'gi.repository.WebKit2',
-                'gi.repository.Gdk',
-                # Essential Qt imports only (if available)
-                'PyQt5.QtCore',
-                'PyQt5.QtGui', 
-                'PyQt5.QtWidgets',
-                'PyQt5.QtWebEngineWidgets',
-                # Essential qtpy imports
-                'qtpy.QtCore',
-                'qtpy.QtGui',
-                'qtpy.QtWidgets',
-            ],
-            hookspath=[],
+                'gi._gi',
+                'gi._gi_cairo',
+                'cairo',
+            ] + gi_submodules,
+            hookspath=['hooks'],
             hooksconfig={},
-            runtime_hooks=[],
+            runtime_hooks=['hooks/hook-gi.py'],
             excludes=[
                 'tkinter', 
                 'matplotlib', 
                 'numpy', 
                 'scipy', 
                 'pandas',
-                # Exclude heavy development/debug modules
                 'IPython',
                 'jupyter',
                 'notebook',
                 'sphinx',
                 'pytest',
                 'setuptools',
-                # Exclude unused GUI frameworks
                 'wx',
                 'kivy',
                 'PySide2',
                 'PySide6',
+                'PyQt5',  # Exclude Qt to focus on GTK
+                'qtpy',
             ],
             win_no_prefer_redirects=False,
             win_private_assemblies=False,
