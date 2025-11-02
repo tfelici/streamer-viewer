@@ -516,3 +516,138 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  commit-executables:
+    name: Commit Executables for Installer Download
+    needs: build
+    runs-on: ubuntu-latest
+    # Only commit on develop and main branches for installer use
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') && always()
+    
+    permissions:
+      contents: write
+      actions: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: build-artifacts
+
+    - name: Prepare executable directories for installer download
+      run: |
+        # Create platform-specific directories for installer download paths
+        mkdir -p windows/dist
+        mkdir -p linux/dist
+        mkdir -p macos/dist
+
+    - name: Copy executables to installer download locations
+      run: |
+        # Copy Windows executable
+        if [ -f "build-artifacts/StreamerViewer-windows/StreamerViewer-windows.exe" ]; then
+          cp "build-artifacts/StreamerViewer-windows/StreamerViewer-windows.exe" "windows/dist/StreamerViewer.exe"
+          echo "✅ Windows executable ready for installer download"
+        elif [ -f "build-artifacts/StreamerViewer-windows/StreamerViewer.exe" ]; then
+          cp "build-artifacts/StreamerViewer-windows/StreamerViewer.exe" "windows/dist/StreamerViewer.exe"
+          echo "✅ Windows executable ready for installer download (alt path)"
+        else
+          echo "⚠️  Windows executable not found in artifacts"
+        fi
+
+        # Copy Linux executable  
+        if [ -f "build-artifacts/StreamerViewer-linux/StreamerViewer-linux" ]; then
+          cp "build-artifacts/StreamerViewer-linux/StreamerViewer-linux" "linux/dist/StreamerViewer"
+          chmod +x "linux/dist/StreamerViewer"
+          echo "✅ Linux executable ready for installer download"
+        elif [ -f "build-artifacts/StreamerViewer-linux/StreamerViewer" ]; then
+          cp "build-artifacts/StreamerViewer-linux/StreamerViewer" "linux/dist/StreamerViewer"
+          chmod +x "linux/dist/StreamerViewer"
+          echo "✅ Linux executable ready for installer download (alt path)"
+        else
+          echo "⚠️  Linux executable not found in artifacts"
+        fi
+
+        # Copy macOS executable (extract from zip)
+        if [ -f "build-artifacts/StreamerViewer-macos/StreamerViewer-macos.zip" ]; then
+          cd build-artifacts/StreamerViewer-macos/
+          unzip -q StreamerViewer-macos.zip
+          if [ -f "StreamerViewer.app/Contents/MacOS/StreamerViewer" ]; then
+            cp "StreamerViewer.app/Contents/MacOS/StreamerViewer" "../../macos/dist/StreamerViewer"
+            chmod +x "../../macos/dist/StreamerViewer"
+            cd ../..
+            echo "✅ macOS executable ready for installer download"
+          else
+            cd ../..
+            echo "⚠️  macOS executable not found in app bundle"
+          fi
+        else
+          echo "⚠️  macOS executable zip not found in artifacts"
+        fi
+
+    - name: Check for executable availability
+      id: check_executables
+      run: |
+        # Check if executables exist for installer download
+        executables_found=false
+        
+        if [ -f "windows/dist/StreamerViewer.exe" ]; then
+          echo "✓ Windows executable available for installer download"
+          executables_found=true
+        fi
+        
+        if [ -f "linux/dist/StreamerViewer" ]; then
+          echo "✓ Linux executable available for installer download"
+          executables_found=true
+        fi
+        
+        if [ -f "macos/dist/StreamerViewer" ]; then
+          echo "✓ macOS executable available for installer download"
+          executables_found=true
+        fi
+        
+        if [ "$executables_found" = "true" ]; then
+          echo "executables_ready=true" >> $GITHUB_OUTPUT
+          echo "📦 Executables ready for installer download"
+        else
+          echo "executables_ready=false" >> $GITHUB_OUTPUT
+          echo "❌ No executables found for installer download"
+        fi
+
+    - name: Commit executables for installer download
+      if: steps.check_executables.outputs.executables_ready == 'true'
+      run: |
+        # Configure git
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Add executables for installer download (force add to override .gitignore)
+        git add -f windows/dist/StreamerViewer.exe linux/dist/StreamerViewer macos/dist/StreamerViewer
+        
+        # Commit with build info for installer use
+        git commit -m "🤖 Update executables for installer download (build ${{ github.run_number }})" \
+                   -m "Built from: ${{ github.sha }}" \
+                   -m "Branch: ${{ github.ref_name }}" \
+                   -m "Purpose: RPI Streamer installer download paths"
+        
+        # Push to the current branch
+        git push origin ${{ github.ref_name }}
+        
+        echo "✅ Executables committed for installer download at:"
+        echo "   • windows/dist/StreamerViewer.exe"
+        echo "   • linux/dist/StreamerViewer" 
+        echo "   • macos/dist/StreamerViewer"
+
+    - name: Summary
+      run: |
+        echo "📦 Executable commit job completed"
+        echo "🎯 Purpose: Make executables available for RPI Streamer installer script"
+        echo "📋 Installer download paths:"
+        echo "   • Windows: https://github.com/tfelici/Streamer-Viewer/raw/${{ github.ref_name }}/windows/dist/StreamerViewer.exe"
+        echo "   • Linux: https://github.com/tfelici/Streamer-Viewer/raw/${{ github.ref_name }}/linux/dist/StreamerViewer"
+        echo "   • macOS: https://github.com/tfelici/Streamer-Viewer/raw/${{ github.ref_name }}/macos/dist/StreamerViewer"
+        echo "💡 Users can also download from GitHub Actions artifacts for manual use"
