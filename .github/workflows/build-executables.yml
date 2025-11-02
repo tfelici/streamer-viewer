@@ -66,12 +66,12 @@ jobs:
     - name: Build executable with PyInstaller (Windows/Linux with splash)
       if: matrix.platform != 'macos'
       run: |
-        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview --splash "splash.png" main.py
+        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview --hidden-import=pyi_splash --collect-all pyi_splash --splash "splash.png" --debug=imports main.py
 
     - name: Build executable with PyInstaller (macOS without splash)
       if: matrix.platform == 'macos'
       run: |
-        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview main.py
+        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview --hidden-import=pyi_splash main.py
 
 
 
