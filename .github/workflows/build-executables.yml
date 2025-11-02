@@ -63,15 +63,95 @@ jobs:
         pip install Flask requests requests-toolbelt Pillow pyinstaller
         pip install pywebview pymediainfo
 
+    - name: Create PyInstaller spec file (Windows/Linux with splash)
+      if: matrix.platform != 'macos'
+      run: |
+        python -c "
+        import os
+        spec_content = '''# -*- mode: python ; coding: utf-8 -*-
+        block_cipher = None
+        
+        a = Analysis(
+            ['main.py'],
+            pathex=['.'],
+            binaries=[],
+            datas=[
+                ('templates', 'templates'),
+                ('static', 'static'),
+                ('splash.png', '.'),
+            ],
+            hiddenimports=[
+                'webview',
+                'webview.platforms.winforms',
+                'webview.platforms.cef',
+                'webview.platforms.qt',
+                'webview.platforms.gtk',
+                'pymediainfo',
+                'flask',
+                'requests',
+                'pyi_splash',
+            ],
+            hookspath=[],
+            hooksconfig={},
+            runtime_hooks=[],
+            excludes=['tkinter', 'matplotlib', 'numpy', 'scipy', 'pandas'],
+            win_no_prefer_redirects=False,
+            win_private_assemblies=False,
+            cipher=block_cipher,
+            noarchive=False,
+        )
+        
+        pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+        
+        splash = Splash(
+            'splash.png',
+            binaries=a.binaries,
+            datas=a.datas,
+            text_pos=(10, 300),
+            text_size=14,
+            text_color='white',
+            minify_script=True,
+            always_on_top=True,
+        )
+        
+        exe = EXE(
+            pyz,
+            a.scripts,
+            splash,
+            splash.binaries,
+            a.binaries,
+            a.zipfiles,
+            a.datas,
+            [],
+            name='StreamerViewer',
+            debug=False,
+            bootloader_ignore_signals=False,
+            strip=False,
+            upx=False,
+            upx_exclude=[],
+            runtime_tmpdir=None,
+            console=False,
+            disable_windowed_traceback=False,
+            argv_emulation=False,
+            target_arch=None,
+            codesign_identity=None,
+            entitlements_file=None,
+        )
+        '''
+        with open('StreamerViewer.spec', 'w') as f:
+            f.write(spec_content)
+        print('Spec file created successfully')
+        "
+
     - name: Build executable with PyInstaller (Windows/Linux with splash)
       if: matrix.platform != 'macos'
       run: |
-        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview --hidden-import=pyi_splash --collect-all pyi_splash --splash "splash.png" --debug=imports main.py
+        pyinstaller StreamerViewer.spec --noconfirm --clean
 
     - name: Build executable with PyInstaller (macOS without splash)
       if: matrix.platform == 'macos'
       run: |
-        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview --hidden-import=pyi_splash main.py
+        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview main.py
 
 
 
