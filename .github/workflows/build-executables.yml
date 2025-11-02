@@ -63,9 +63,15 @@ jobs:
         pip install Flask requests requests-toolbelt Pillow pyinstaller
         pip install pywebview pymediainfo
 
-    - name: Build executable with PyInstaller
+    - name: Build executable with PyInstaller (Windows/Linux with splash)
+      if: matrix.platform != 'macos'
       run: |
         pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview --splash "splash.png" main.py
+
+    - name: Build executable with PyInstaller (macOS without splash)
+      if: matrix.platform == 'macos'
+      run: |
+        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview main.py
 
 
 
