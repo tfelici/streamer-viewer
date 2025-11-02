@@ -65,7 +65,7 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview main.py
+        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview --splash "splash.png" main.py
 
 
 
