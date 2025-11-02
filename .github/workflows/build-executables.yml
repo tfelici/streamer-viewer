@@ -104,10 +104,26 @@ jobs:
 
     - name: List build output (Debug)
       run: |
-        echo "Contents of dist directory:"
-        ls -la dist/
-        echo "Contents of artifacts directory:"
-        ls -la artifacts/ || echo "No artifacts directory"
+        python -c "
+        import os
+        print('Contents of dist directory:')
+        try:
+            for item in os.listdir('dist'):
+                item_path = os.path.join('dist', item)
+                size = os.path.getsize(item_path) if os.path.isfile(item_path) else 'DIR'
+                print(f'  {item} ({size} bytes)' if size != 'DIR' else f'  {item}/ (DIR)')
+        except Exception as e:
+            print(f'  Error listing dist: {e}')
+        
+        print('Contents of artifacts directory:')
+        try:
+            for item in os.listdir('artifacts'):
+                item_path = os.path.join('artifacts', item)
+                size = os.path.getsize(item_path) if os.path.isfile(item_path) else 'DIR'
+                print(f'  {item} ({size} bytes)' if size != 'DIR' else f'  {item}/ (DIR)')
+        except Exception as e:
+            print(f'  No artifacts directory or error: {e}')
+        "
 
     - name: Upload executable artifact
       uses: actions/upload-artifact@v4
