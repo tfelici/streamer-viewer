@@ -40,12 +40,12 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        
-        # Install only the dependencies we can test safely in CI
         pip install Flask requests requests-toolbelt Pillow
-        
-        # Try to install optional dependencies (may fail in CI)
-        pip install pywebview pymediainfo || echo "Some optional dependencies not available in CI environment"
+
+    - name: Install optional dependencies
+      run: |
+        python -m pip install pywebview pymediainfo
+      continue-on-error: true
 
     - name: Syntax check
       run: |
