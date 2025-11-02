@@ -77,8 +77,8 @@ jobs:
         pip install Flask requests requests-toolbelt Pillow pyinstaller
         pip install pywebview pymediainfo
 
-    - name: Install GUI frameworks (Windows/macOS)
-      if: matrix.platform != 'linux'
+    - name: Install GUI frameworks (macOS only - Windows uses webview native)
+      if: matrix.platform == 'macos'
       run: |
         pip install PyQt5 PyQt5-Qt5 PyQt5-sip
 
@@ -102,27 +102,41 @@ jobs:
             hiddenimports=[
                 'webview',
                 'webview.platforms.winforms',
-                'webview.platforms.cef',
-                'webview.platforms.qt',
-                'webview.platforms.gtk',
                 'pymediainfo',
                 'flask',
                 'requests',
                 'pyi_splash',
-                'PyQt5',
-                'PyQt5.QtCore',
-                'PyQt5.QtGui',
-                'PyQt5.QtWidgets',
-                'PyQt5.QtWebEngineWidgets',
-                'qtpy',
-                'qtpy.QtCore',
-                'qtpy.QtGui',
-                'qtpy.QtWidgets',
             ],
             hookspath=[],
             hooksconfig={},
             runtime_hooks=[],
-            excludes=['tkinter', 'matplotlib', 'numpy', 'scipy', 'pandas'],
+            excludes=[
+                'tkinter', 
+                'matplotlib', 
+                'numpy', 
+                'scipy', 
+                'pandas',
+                'IPython',
+                'jupyter',
+                'notebook',
+                'sphinx',
+                'pytest',
+                'setuptools',
+                'PyQt5',
+                'PySide2',
+                'PySide6',
+                'qtpy',
+                'gi',
+                'gtk',
+                'wx',
+                'kivy',
+                'tornado',
+                'django',
+                'sqlalchemy',
+                'psycopg2',
+                'sqlite3',  # Often not needed for web-based apps
+                'urllib3.packages.six',  # Can cause bloat
+            ],
             win_no_prefer_redirects=False,
             win_private_assemblies=False,
             cipher=block_cipher,
@@ -171,113 +185,83 @@ jobs:
         print('Windows spec file created successfully')
         "
 
-    - name: Install Python GTK packages for bundling
+    - name: Install minimal Python GTK packages for bundling
       if: matrix.platform == 'linux'
       run: |
-        # Install additional system packages needed for pygobject compilation
-        sudo apt-get install -y \
-          build-essential \
-          python3-dev \
-          libffi-dev \
-          meson \
-          ninja-build
+        # Use system packages for GTK to avoid compilation overhead
+        # This is more reliable and produces smaller executables
+        echo "Using system GTK packages - more reliable and smaller executables"
         
-        # Install GTK packages for better PyInstaller integration
-        # Try to install pycairo and pygobject via pip
-        pip install pycairo
+        # Install minimal Qt support for fallback
+        pip install qtpy || echo "qtpy install failed, will use GTK only"
         
-        # Set environment variables for pygobject compilation
-        export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
-        export CFLAGS="-I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include"
-        
-        # Try pygobject installation with better configuration
-        pip install --no-cache-dir pygobject || {
-          echo "pygobject pip install failed, using alternative approach"
-          # Use system python3-gi instead
-          sudo apt-get install -y python3-gi-dev
-        }
-        
-        # Also install qtpy for Qt support
-        pip install qtpy
-        
-    - name: Create PyInstaller spec file (Linux with aggressive GUI bundling)
+    - name: Create PyInstaller spec file (Linux with selective GUI bundling)
       if: matrix.platform == 'linux'
       run: |
         python -c "
         import os
         spec_content = '''# -*- mode: python ; coding: utf-8 -*-
-        from PyInstaller.utils.hooks import collect_all, collect_submodules, collect_data_files
-
-        # Aggressive collection of all GUI-related modules and data
-        gi_datas, gi_binaries, gi_hiddenimports = collect_all('gi')
-        cairo_datas, cairo_binaries, cairo_hiddenimports = collect_all('cairo')
+        # Selective bundling approach to minimize executable size
         
-        # Try to collect PyQt5 if available, but don't fail if not
-        try:
-            pyqt5_datas, pyqt5_binaries, pyqt5_hiddenimports = collect_all('PyQt5')
-        except:
-            pyqt5_datas, pyqt5_binaries, pyqt5_hiddenimports = [], [], []
-            
-        # Collect system GTK libraries and typelibs
-        gtk_datas = collect_data_files('gi', include_py_files=False)
-        gi_repo_hiddenimports = collect_submodules('gi.repository')
-        
-        # Additional GTK/GObject imports
-        additional_hiddenimports = [
-            'gi._gi',
-            'gi._gi_cairo', 
-            'gi.repository.GObject',
-            'gi.repository.Gio',
-            'gi.repository.GdkPixbuf',
-            'gi.repository.Pango',
-            'gi.repository.PangoCairo',
-            'cairo._cairo',
-            'pygtkcompat',
-        ]
-
         block_cipher = None
         
         a = Analysis(
             ['main.py'],
             pathex=['.'],
-            binaries=gi_binaries + cairo_binaries + pyqt5_binaries,
+            binaries=[],
             datas=[
                 ('templates', 'templates'),
                 ('static', 'static'),
                 ('splash.png', '.'),
-            ] + gi_datas + cairo_datas + pyqt5_datas + gtk_datas,
+            ],
             hiddenimports=[
                 'webview',
-                'webview.platforms.winforms',
-                'webview.platforms.cef',
-                'webview.platforms.qt', 
                 'webview.platforms.gtk',
+                'webview.platforms.qt', 
                 'pymediainfo',
                 'flask',
                 'requests',
                 'pyi_splash',
+                # Essential GTK imports only
                 'gi',
                 'gi.repository',
                 'gi.repository.Gtk',
                 'gi.repository.GLib',
+                'gi.repository.GObject',
                 'gi.repository.WebKit2',
                 'gi.repository.Gdk',
-                'cairo',
-                '_gi_cairo',
-                'PyQt5',
+                # Essential Qt imports only (if available)
                 'PyQt5.QtCore',
-                'PyQt5.QtGui',
+                'PyQt5.QtGui', 
                 'PyQt5.QtWidgets',
                 'PyQt5.QtWebEngineWidgets',
-                'qtpy',
+                # Essential qtpy imports
                 'qtpy.QtCore',
                 'qtpy.QtGui',
                 'qtpy.QtWidgets',
-            ] + gi_hiddenimports + cairo_hiddenimports + pyqt5_hiddenimports + gi_repo_hiddenimports + additional_hiddenimports,
+            ],
             hookspath=[],
             hooksconfig={},
             runtime_hooks=[],
-            excludes=['tkinter', 'matplotlib', 'numpy', 'scipy', 'pandas'],
+            excludes=[
+                'tkinter', 
+                'matplotlib', 
+                'numpy', 
+                'scipy', 
+                'pandas',
+                # Exclude heavy development/debug modules
+                'IPython',
+                'jupyter',
+                'notebook',
+                'sphinx',
+                'pytest',
+                'setuptools',
+                # Exclude unused GUI frameworks
+                'wx',
+                'kivy',
+                'PySide2',
+                'PySide6',
+            ],
             win_no_prefer_redirects=False,
             win_private_assemblies=False,
             cipher=block_cipher,
@@ -336,10 +320,28 @@ jobs:
       run: |
         pyinstaller StreamerViewer.spec --noconfirm --clean
 
-    - name: Build executable with PyInstaller (macOS without splash)
+    - name: Build executable with PyInstaller (macOS optimized)
       if: matrix.platform == 'macos'
       run: |
-        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview main.py
+        pyinstaller --onefile --windowed --name StreamerViewer \
+          --add-data "templates:templates" \
+          --add-data "static:static" \
+          --hidden-import=pymediainfo \
+          --hidden-import=webview \
+          --hidden-import=webview.platforms.cocoa \
+          --hidden-import=flask \
+          --hidden-import=requests \
+          --exclude-module=tkinter \
+          --exclude-module=matplotlib \
+          --exclude-module=numpy \
+          --exclude-module=scipy \
+          --exclude-module=pandas \
+          --exclude-module=IPython \
+          --exclude-module=jupyter \
+          --exclude-module=PyQt5 \
+          --exclude-module=qtpy \
+          --exclude-module=gi \
+          main.py
 
 
 
