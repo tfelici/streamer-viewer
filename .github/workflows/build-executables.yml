@@ -40,10 +40,12 @@ jobs:
         python-version: '3.13'
         cache: 'pip'
 
-    - name: Install system dependencies (Ubuntu)
+    - name: Install system dependencies (Ubuntu) - Development libraries only
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
+        # Install ONLY essential development libraries needed for compilation
+        # NO Python packages from system - we'll use pip exclusively
         sudo apt-get install -y \
           libgtk-3-dev \
           libwebkit2gtk-4.1-dev \
@@ -53,18 +55,27 @@ jobs:
           gobject-introspection \
           libgirepository-1.0-1 \
           gir1.2-glib-2.0 \
-          python3-gi \
-          python3-gi-cairo \
           gir1.2-gtk-3.0 \
           gir1.2-webkit2-4.1 \
+          pkg-config \
+          build-essential \
+          python3-dev \
+          libffi-dev
+        
+        # Explicitly remove ALL system Python packages to avoid conflicts
+        sudo apt-get remove -y \
+          python3-gi \
+          python3-gi-cairo \
           python3-pyqt5 \
           python3-pyqt5.qtwebengine \
-          pyqt5-dev-tools \
-          qtbase5-dev \
-          qtchooser \
-          qt5-qmake \
-          qtbase5-dev-tools \
-          pkg-config
+          python3-cryptography \
+          python3-requests \
+          python3-urllib3 \
+          python3-pil \
+          python3-flask || true
+        
+        # Clean pip environment
+        python -m pip install --upgrade pip setuptools wheel
 
     - name: Install system dependencies (macOS)
       if: matrix.os == 'macos-latest'
@@ -185,40 +196,30 @@ jobs:
         print('Windows spec file created successfully')
         "
 
-    - name: Install Python GTK packages for webview support
+    - name: Install Python GTK packages via pip only
       if: matrix.platform == 'linux'
       run: |
-        # Install essential packages for pywebview GTK support
-        # Use system packages where possible to avoid compilation issues
-        echo "Installing GTK support for pywebview..."
+        # Install GTK Python bindings exclusively via pip for consistency
+        echo "Installing GTK support via pip for clean PyInstaller bundling..."
         
-        # Try to install pycairo via pip (usually works)
-        pip install pycairo || echo "pycairo pip install failed"
+        # Set environment for successful compilation
+        export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+        export CFLAGS="-I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include"
         
-        # For pygobject, use system packages due to complex dependencies
-        # The system packages are already installed, just ensure python can find them
-        export PYTHONPATH="/usr/lib/python3/dist-packages:$PYTHONPATH"
+        # Install via pip for better PyInstaller compatibility
+        pip install pycairo
+        pip install PyGObject || echo "PyGObject failed - using system fallback approach"
         
     - name: Create PyInstaller spec file (Linux with targeted GTK bundling)
       if: matrix.platform == 'linux'
       run: |
-        # Create runtime hook for GTK library loading
+        # Create minimal runtime hook for GTK (pip packages should be self-contained)
         mkdir -p hooks
         cat > hooks/hook-gi.py << 'EOF'
-        # Runtime hook to help gi find system libraries
+        # Minimal runtime hook for GTK pip packages
+        # Since we're using pip exclusively, this should be minimal
         import os
         import sys
-
-        # Add system library paths
-        gi_paths = [
-            '/usr/lib/python3/dist-packages',
-            '/usr/lib/python3.13/dist-packages', 
-            '/usr/local/lib/python3.13/dist-packages'
-        ]
-        
-        for path in gi_paths:
-            if path not in sys.path and os.path.exists(path):
-                sys.path.insert(0, path)
         EOF
         
         python -c "
@@ -247,12 +248,7 @@ jobs:
         
         a = Analysis(
             ['main.py'],
-            pathex=[
-                '.', 
-                '/usr/lib/python3/dist-packages',
-                '/usr/lib/python3.13/dist-packages',
-                '/usr/local/lib/python3.13/dist-packages'
-            ],
+            pathex=['.'],
             binaries=[],
             datas=[
                 ('templates', 'templates'),
@@ -294,6 +290,7 @@ jobs:
                 'PySide6',
                 'PyQt5',  # Exclude Qt to focus on GTK
                 'qtpy',
+
             ],
             win_no_prefer_redirects=False,
             win_private_assemblies=False,
