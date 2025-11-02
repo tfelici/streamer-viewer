@@ -69,24 +69,38 @@ jobs:
 
 
 
-    - name: Prepare artifacts (Linux/Windows)
-      if: matrix.platform != 'macos'
+    - name: Create artifacts directory
       run: |
-        mkdir -p artifacts
-        if [ "${{ matrix.platform }}" = "windows" ]; then
-          cp dist/StreamerViewer.exe artifacts/StreamerViewer-${{ matrix.platform }}${{ matrix.executable-suffix }}
-        else
-          cp dist/StreamerViewer artifacts/StreamerViewer-${{ matrix.platform }}
-        fi
+        python -c "import os; os.makedirs('artifacts', exist_ok=True)"
+
+    - name: Prepare artifacts (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        python -c "
+        import shutil
+        shutil.copy('dist/StreamerViewer.exe', 'artifacts/StreamerViewer-windows.exe')
+        print('Windows executable copied to artifacts')
+        "
+
+    - name: Prepare artifacts (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        python -c "
+        import shutil
+        shutil.copy('dist/StreamerViewer', 'artifacts/StreamerViewer-linux')
+        print('Linux executable copied to artifacts')
+        "
 
     - name: Prepare artifacts (macOS)
       if: matrix.platform == 'macos'
       run: |
-        mkdir -p artifacts
-        # Create a zip of the .app bundle for easier distribution
-        cd dist
-        zip -r ../artifacts/StreamerViewer-macos.zip StreamerViewer.app
-        cd ..
+        python -c "
+        import shutil
+        import os
+        os.chdir('dist')
+        shutil.make_archive('../artifacts/StreamerViewer-macos', 'zip', '.', 'StreamerViewer.app')
+        print('macOS app bundle zipped to artifacts')
+        "
 
     - name: List build output (Debug)
       run: |
