@@ -51,25 +51,39 @@ jobs:
       run: |
         python -m py_compile main.py
 
+    - name: Set UTF-8 encoding (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
+        echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
+
     - name: Basic import test
       run: |
         python -c "
         import sys
-        print('Python version:', sys.version)
+        import os
+        
+        # Force UTF-8 output on Windows
+        if sys.platform == 'win32':
+            import codecs
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+        
+        print('✅ Python version:', sys.version)
         
         # Test individual imports
         try:
             import flask
-            print('SUCCESS: Flask imported')
+            print('✅ Flask imported')
         except Exception as e:
-            print(f'ERROR: Flask import failed: {e}')
+            print(f'❌ Flask import failed: {e}')
             sys.exit(1)
             
         try:
             import requests
-            print('SUCCESS: Requests imported')
+            print('✅ Requests imported')
         except Exception as e:
-            print(f'ERROR: Requests import failed: {e}')
+            print(f'❌ Requests import failed: {e}')
             sys.exit(1)
         "
 
@@ -79,16 +93,22 @@ jobs:
         import sys
         import os
         
+        # Force UTF-8 output on Windows
+        if sys.platform == 'win32':
+            import codecs
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+        
         # Check if main.py exists and is readable
         if os.path.exists('main.py'):
-            print('SUCCESS: main.py file exists')
+            print('✅ main.py file exists')
             with open('main.py', 'r', encoding='utf-8') as f:
                 content = f.read()
                 if 'Flask' in content and 'webview' in content:
-                    print('SUCCESS: main.py contains expected imports')
+                    print('✅ main.py contains expected imports')
                 else:
-                    print('WARNING: main.py may be missing some imports')
+                    print('⚠️ main.py may be missing some imports')
         else:
-            print('ERROR: main.py not found')
+            print('❌ main.py not found')
             sys.exit(1)
         "
