@@ -37,14 +37,15 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.13'
+        python-version: '3.12'  # Match Ubuntu 24.04 system Python for GTK compatibility
         cache: 'pip'
 
-    - name: Install system dependencies (Ubuntu) - Use system packages for GTK
+    - name: Install system dependencies (Ubuntu) - Install GTK for current Python
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        # Use system packages for ALL GTK-related libraries - more reliable for PyInstaller
+        
+        # Install system GTK libraries and development headers
         sudo apt-get install -y \
           libgtk-3-dev \
           libwebkit2gtk-4.1-dev \
@@ -56,14 +57,20 @@ jobs:
           gir1.2-glib-2.0 \
           gir1.2-gtk-3.0 \
           gir1.2-webkit2-4.1 \
-          python3-gi \
-          python3-gi-cairo \
           pkg-config \
           build-essential \
           python3-dev \
-          libffi-dev
+          libffi-dev \
+          python3-pip
         
-        # Only remove conflicting non-GTK packages, keep GTK system packages
+        # Check current Python version and install corresponding packages
+        PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+        echo "Current Python version: $PYTHON_VERSION"
+        
+        # Install python3-gi-dev for building from source if needed  
+        sudo apt-get install -y python3-gi-dev || echo "python3-gi-dev not available"
+        
+        # Remove conflicting packages
         sudo apt-get remove -y \
           python3-cryptography \
           python3-requests \
@@ -193,19 +200,38 @@ jobs:
         print('Windows spec file created successfully')
         "
 
-    - name: Use system GTK packages (no pip GTK packages)
+    - name: Install GTK packages for current Python version
       if: matrix.platform == 'linux'
       run: |
-        # Use system GTK packages exclusively - more reliable for PyInstaller bundling
-        echo "Using system GTK packages for reliable PyInstaller bundling..."
+        echo "Installing GTK packages for current Python version..."
         
-        # Verify system packages are installed and accessible
-        python3 -c "import gi; print('✓ gi (GObject Introspection) available')"
-        python3 -c "import gi; gi.require_version('Gtk', '3.0'); from gi.repository import Gtk; print('✓ GTK3 available')"
-        python3 -c "import cairo; print('✓ pycairo available')" || echo "⚠️  pycairo not available via system packages"
+        # Set environment for compilation
+        export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+        export CFLAGS="-I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include"
         
-        # Only install non-GTK packages via pip
-        echo "System GTK packages verified - skipping pip GTK installation"
+        # Try system packages first, fall back to pip
+        python -c "import gi; print('✓ gi (GObject Introspection) available via system')" || {
+          echo "System gi not available for Python $(python --version), installing via pip..."
+          pip install PyGObject pycairo
+        }
+        
+        # Verify GTK is working
+        python -c "
+        import gi
+        print('✓ gi (GObject Introspection) available')
+        gi.require_version('Gtk', '3.0')
+        from gi.repository import Gtk
+        print('✓ GTK3 available')
+        " || {
+          echo "GTK verification failed, this may cause pywebview issues"
+          exit 1
+        }
+        
+        # Verify pycairo
+        python -c "import cairo; print('✓ pycairo available')" || {
+          echo "Installing pycairo via pip..."
+          pip install pycairo
+        }
         
     - name: Create PyInstaller spec file (Linux with targeted GTK bundling)
       if: matrix.platform == 'linux'
