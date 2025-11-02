@@ -56,7 +56,7 @@ jobs:
           gir1.2-webkit2-4.1 \
           python3-pyqt5 \
           python3-pyqt5.qtwebengine \
-          python3-pyqt5-dev \
+          pyqt5-dev-tools \
           qtbase5-dev \
           qtchooser \
           qt5-qmake \
@@ -73,10 +73,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install Flask requests requests-toolbelt Pillow pyinstaller
         pip install pywebview pymediainfo
-        # Install GUI frameworks for bundling (Linux gets PyQt5 from system packages)
-        if [ "${{ matrix.platform }}" != "linux" ]; then
-          pip install PyQt5 PyQt5-Qt5 PyQt5-sip
-        fi
+
+    - name: Install GUI frameworks (Windows/macOS)
+      if: matrix.platform != 'linux'
+      run: |
+        pip install PyQt5 PyQt5-Qt5 PyQt5-sip
 
     - name: Create PyInstaller spec file (Windows/Linux with splash)
       if: matrix.platform != 'macos'
@@ -175,15 +176,15 @@ jobs:
         print('Spec file created successfully')
         "
 
-    - name: Build executable with PyInstaller (Windows/Linux with splash)
-      if: matrix.platform != 'macos'
+    - name: Build executable with PyInstaller (Windows with splash)
+      if: matrix.platform == 'windows'
       run: |
-        if [ "${{ matrix.platform }}" = "linux" ]; then
-          # For Linux, collect all GUI dependencies to ensure self-contained executable
-          pyinstaller StreamerViewer.spec --noconfirm --clean --collect-all gi --collect-all cairo --collect-all PyQt5 --collect-submodules gi.repository
-        else
-          pyinstaller StreamerViewer.spec --noconfirm --clean
-        fi
+        pyinstaller StreamerViewer.spec --noconfirm --clean
+
+    - name: Build executable with PyInstaller (Linux with splash and GUI bundling)
+      if: matrix.platform == 'linux'
+      run: |
+        pyinstaller StreamerViewer.spec --noconfirm --clean --collect-all gi --collect-all cairo --collect-all PyQt5 --collect-submodules gi.repository
 
     - name: Build executable with PyInstaller (macOS without splash)
       if: matrix.platform == 'macos'
@@ -313,3 +314,100 @@ jobs:
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  commit-executables:
+    name: Commit Executables to Repository
+    needs: build
+    runs-on: ubuntu-latest
+    # Only commit on develop and main branches (not on tags/releases)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: build-artifacts
+
+    - name: Prepare executable directories
+      run: |
+        # Create platform-specific directories if they don't exist
+        mkdir -p windows/dist
+        mkdir -p linux/dist
+        mkdir -p macos/dist
+
+    - name: Copy executables to correct locations
+      run: |
+        # Copy Windows executable
+        if [ -f "build-artifacts/StreamerViewer-windows/StreamerViewer.exe" ]; then
+          cp "build-artifacts/StreamerViewer-windows/StreamerViewer.exe" "windows/dist/StreamerViewer.exe"
+          echo "✅ Windows executable copied"
+        else
+          echo "⚠️  Windows executable not found in artifacts"
+        fi
+
+        # Copy Linux executable  
+        if [ -f "build-artifacts/StreamerViewer-linux/StreamerViewer" ]; then
+          cp "build-artifacts/StreamerViewer-linux/StreamerViewer" "linux/dist/StreamerViewer"
+          chmod +x "linux/dist/StreamerViewer"
+          echo "✅ Linux executable copied"
+        else
+          echo "⚠️  Linux executable not found in artifacts"
+        fi
+
+        # Copy macOS executable
+        if [ -f "build-artifacts/StreamerViewer-macos/StreamerViewer" ]; then
+          cp "build-artifacts/StreamerViewer-macos/StreamerViewer" "macos/dist/StreamerViewer"
+          chmod +x "macos/dist/StreamerViewer"
+          echo "✅ macOS executable copied"
+        else
+          echo "⚠️  macOS executable not found in artifacts"
+        fi
+
+    - name: Check for changes
+      id: check_changes
+      run: |
+        # Check if there are any changes to commit
+        if git diff --quiet && git diff --staged --quiet; then
+          echo "changes=false" >> $GITHUB_OUTPUT
+          echo "No executable changes to commit"
+        else
+          echo "changes=true" >> $GITHUB_OUTPUT
+          echo "Executable changes detected"
+          git status
+        fi
+
+    - name: Commit and push executables
+      if: steps.check_changes.outputs.changes == 'true'
+      run: |
+        # Configure git
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Add executables
+        git add windows/dist/StreamerViewer.exe linux/dist/StreamerViewer macos/dist/StreamerViewer
+        
+        # Commit with build info
+        git commit -m "🤖 Auto-update executables from build ${{ github.run_number }}" \
+                   -m "Built from commit: ${{ github.sha }}" \
+                   -m "Branch: ${{ github.ref_name }}" \
+                   -m "Triggered by: ${{ github.event_name }}"
+        
+        # Push to the current branch
+        git push origin ${{ github.ref_name }}
+        
+        echo "✅ Executables committed and pushed to ${{ github.ref_name }} branch"
+
+    - name: Summary
+      run: |
+        echo "📦 Executable commit job completed"
+        echo "🌟 Executables are now available for download by the installer script"
+        echo "📋 Installer will download from:"
+        echo "   • Windows: windows/dist/StreamerViewer.exe"
+        echo "   • Linux: linux/dist/StreamerViewer"  
+        echo "   • macOS: macos/dist/StreamerViewer"

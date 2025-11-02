@@ -823,7 +823,7 @@ def main():
     if SPLASH_AVAILABLE:
         try:
             pyi_splash.update_text("🚀 Starting Streamer Viewer...")
-            time.sleep(0.5)
+            time.sleep(1.0)  # Longer delay to see the message
         except Exception as e:
             print(f"Splash screen update error: {e}")
     
@@ -833,7 +833,7 @@ def main():
     if SPLASH_AVAILABLE:
         try:
             pyi_splash.update_text("📁 Checking data directories...")
-            time.sleep(0.3)
+            time.sleep(0.8)  # Longer delay to see the message
         except Exception as e:
             print(f"Splash screen update error: {e}")
         
