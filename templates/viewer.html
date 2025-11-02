@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Track Viewer - {{ track.track_id }}</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛰️</text></svg>">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fontawesome-minimal.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -17,7 +19,7 @@
                 <span>Duration: {{ track.duration | durationformat }}</span>
                 <span>Points: {{ track.coord_count }}</span>
             </div>
-            <a href="{{ url_for('index') }}" class="btn btn-secondary">← Back to List</a>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
         </header>
 
         <div class="viewer-content">

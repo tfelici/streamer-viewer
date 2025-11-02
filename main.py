@@ -13,7 +13,12 @@ import socket
 import glob
 import re
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response
+import json
+import uuid
+from werkzeug.utils import secure_filename
+import requests
+from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 
 # Pure Python MP4 parsing
 import struct
@@ -41,6 +46,12 @@ else:
 STREAMER_DATA_DIR = os.path.join(BASE_DIR, 'streamerData')
 TRACKS_DIR = os.path.join(STREAMER_DATA_DIR, 'tracks')
 RECORDINGS_DIR = os.path.join(STREAMER_DATA_DIR, 'recordings', 'webcam')
+
+# Global dictionary to track upload progress and allow cancellation
+upload_progress = {}
+upload_threads = {}
+# SSE clients tracking for upload progress
+upload_sse_clients = {}
 
 def get_track_files():
     """Get list of GPS track files (.tsv format)"""
@@ -314,6 +325,69 @@ def find_all_related_videos(track_start_time, track_end_time, videos):
     
     return related_videos
 
+def get_recording_files():
+    """Get list of recording files from the hierarchical recordings directory structure"""
+    files = []
+    
+    if not os.path.exists(RECORDINGS_DIR):
+        return files
+    
+    # Collect all files with their modification times for sorting
+    all_files = []
+    
+    # Walk through hierarchical structure: domain/rtmpkey/files
+    for domain in os.listdir(RECORDINGS_DIR):
+        domain_path = os.path.join(RECORDINGS_DIR, domain)
+        if not os.path.isdir(domain_path):
+            continue
+            
+        for rtmpkey in os.listdir(domain_path):
+            rtmpkey_path = os.path.join(domain_path, rtmpkey)
+            if not os.path.isdir(rtmpkey_path):
+                continue
+                
+            # Get all mp4 files in this rtmpkey directory
+            for filename in os.listdir(rtmpkey_path):
+                if filename.endswith('.mp4'):
+                    file_path = os.path.join(rtmpkey_path, filename)
+                    try:
+                        mtime = os.path.getmtime(file_path)
+                        display_name = f"{domain}/{rtmpkey}/{filename}"
+                        all_files.append((mtime, file_path, display_name, domain, rtmpkey))
+                    except OSError:
+                        continue
+    
+    # Sort all files by modification time, newest first
+    all_files.sort(key=lambda x: x[0], reverse=True)
+    
+    # Process sorted files
+    for mtime, file_path, display_name, domain, rtmpkey in all_files:
+        try:
+            size = os.path.getsize(file_path)
+            duration = get_video_duration_mediainfo(file_path)
+            
+            # Extract timestamp from filename if possible (format: timestamp.mp4)
+            filename = os.path.basename(file_path)
+            m = re.match(r'^(\d+)\.mp4$', filename)
+            timestamp = int(m.group(1)) if m else None
+            
+            files.append({
+                'path': file_path,
+                'name': display_name,
+                'size': size,
+                'location': 'Local',
+                'active': False,  # No active recordings in uploader
+                'duration': duration,
+                'timestamp': timestamp,
+                'domain': domain,
+                'rtmpkey': rtmpkey
+            })
+            
+        except OSError:
+            continue
+    
+    return files
+
 @app.template_filter('datetimeformat')
 def datetimeformat(value):
     """Format timestamp for display"""
@@ -509,6 +583,216 @@ def delete_track():
         
     except Exception as e:
         return jsonify({'error': f'Failed to delete track: {str(e)}'}), 500
+
+@app.route('/uploader')
+def uploader():
+    """Uploader page - Upload Recordings only"""
+    recording_files = get_recording_files()
+    return render_template('uploader.html', 
+                         recording_files=recording_files,
+                         streaming=False,
+                         uploadrecordingsonly=True)
+
+@app.route('/upload-recording', methods=['POST'])
+def upload_recording():
+    """Upload a recording file to the configured server"""
+    from werkzeug.utils import secure_filename
+    import re
+    
+    file_path = request.form.get('file_path')
+    if not file_path or not os.path.isfile(file_path):
+        return jsonify({'error': 'Recording file not found.'}), 400
+    
+    # Extract domain and rtmpkey from hierarchical file path
+    # Expected format: .../recordings/webcam/<domain>/<rtmpkey>/<filename>
+    try:
+        # Get the relative path from the recordings/webcam directory
+        path_parts = file_path.replace('\\', '/').split('/')
+        
+        # Find the webcam directory and extract domain/rtmpkey from the path after it
+        webcam_idx = -1
+        for i, part in enumerate(path_parts):
+            if part == 'webcam':
+                webcam_idx = i
+                break
+        
+        if webcam_idx == -1 or webcam_idx + 2 >= len(path_parts):
+            return jsonify({'error': 'Invalid file path format. Expected: .../recordings/webcam/<domain>/<rtmpkey>/<filename>'}), 400
+        
+        domain = path_parts[webcam_idx + 1]
+        rtmpkey = path_parts[webcam_idx + 2]
+        
+        if not domain or not rtmpkey:
+            return jsonify({'error': 'Could not extract domain and rtmpkey from file path.'}), 400
+        
+        # Construct upload URL dynamically
+        upload_url = f"https://{domain}.org/ajaxservices.php?command=replacerecordings&rtmpkey={rtmpkey}"
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to parse file path: {e}'}), 400
+    
+    # Generate unique upload ID for progress tracking
+    upload_id = str(uuid.uuid4())
+    
+    # Store upload progress globally
+    upload_progress[upload_id] = {
+        'progress': 0,
+        'status': 'starting',
+        'error': None,
+        'result': None,
+        'cancelled': False
+    }
+    
+    def upload_file_async():
+        try:
+            upload_progress[upload_id]['status'] = 'uploading'
+            
+            # Get file size for progress calculation
+            file_size = os.path.getsize(file_path)
+            
+            def progress_callback(monitor):
+                if upload_progress[upload_id]['cancelled']:
+                    # Cancel the upload by raising an exception
+                    raise Exception("Upload cancelled by user")
+                
+                progress = min(100, int((monitor.bytes_read / file_size) * 100))
+                upload_progress[upload_id]['progress'] = progress
+                
+                # Notify all SSE clients about the progress
+                for client_id, client_data in upload_sse_clients.items():
+                    if client_data['upload_id'] == upload_id:
+                        try:
+                            # Send progress update to SSE client
+                            client_data['queue'].put({'progress': progress})
+                        except Exception:
+                            pass  # Ignore errors in notifying clients
+            
+            # Use MultipartEncoder for upload with progress monitoring
+            with open(file_path, 'rb') as f:
+                multipart_data = MultipartEncoder(
+                    fields={'video': (secure_filename(os.path.basename(file_path)), f, 'application/octet-stream')}
+                )
+                
+                monitor = MultipartEncoderMonitor(multipart_data, progress_callback)
+                
+                response = requests.post(
+                    upload_url, 
+                    data=monitor,
+                    headers={'Content-Type': monitor.content_type},
+                    timeout=300
+                )
+                
+                if response.status_code == 200:
+                    try:
+                        result = response.json()
+                    except:
+                        result = {'success': True, 'message': 'Upload completed', 'error': ''}
+                else:
+                    result = {'error': f'Upload failed: {response.status_code}'}
+                
+                upload_progress[upload_id]['status'] = 'completed'
+                upload_progress[upload_id]['progress'] = 100
+                upload_progress[upload_id]['result'] = result
+                        
+        except Exception as e:
+            if upload_progress[upload_id]['cancelled']:
+                upload_progress[upload_id]['status'] = 'cancelled'
+                upload_progress[upload_id]['error'] = 'Upload cancelled by user'
+            else:
+                upload_progress[upload_id]['status'] = 'error'
+                upload_progress[upload_id]['error'] = f'Upload failed: {e}'
+        finally:
+            # Clean up thread reference
+            if upload_id in upload_threads:
+                del upload_threads[upload_id]
+    
+    # Start upload in background thread
+    thread = threading.Thread(target=upload_file_async)
+    thread.daemon = True
+    thread.start()
+    
+    # Store thread reference for potential cancellation
+    upload_threads[upload_id] = thread
+    
+    return jsonify({'upload_id': upload_id, 'status': 'started'})
+
+@app.route('/upload-progress/<upload_id>')
+def get_upload_progress(upload_id):
+    """Get the current progress of an upload"""
+    if upload_id not in upload_progress:
+        return jsonify({'error': 'Upload ID not found'}), 404
+    
+    progress_data = upload_progress[upload_id].copy()
+    
+    # Clean up completed/error/cancelled uploads after returning status
+    if progress_data['status'] in ['completed', 'error', 'cancelled']:
+        # Keep the data for a short time to allow frontend to get final status
+        pass
+    
+    return jsonify(progress_data)
+
+@app.route('/cancel-upload/<upload_id>', methods=['POST'])
+def cancel_upload(upload_id):
+    """Cancel an ongoing upload"""
+    if upload_id not in upload_progress:
+        return jsonify({'error': 'Upload ID not found'}), 404
+    
+    # Mark upload as cancelled
+    upload_progress[upload_id]['cancelled'] = True
+    upload_progress[upload_id]['status'] = 'cancelling'
+    
+    return jsonify({'status': 'cancelling'})
+
+@app.route('/upload-progress-stream/<upload_id>')
+def upload_progress_stream(upload_id):
+    """SSE endpoint for real-time upload progress monitoring"""
+    def generate():
+        # Send initial connection event
+        yield f"data: {json.dumps({'type': 'connected', 'upload_id': upload_id})}\n\n"
+        
+        # Monitor upload progress
+        while upload_id in upload_progress:
+            progress_data = upload_progress[upload_id].copy()
+            
+            # Send progress update
+            progress_data['type'] = 'progress'
+            yield f"data: {json.dumps(progress_data)}\n\n"
+            
+            # If upload is finished, send final status and close
+            if progress_data['status'] in ['completed', 'error', 'cancelled']:
+                time.sleep(0.1)  # Small delay to ensure client receives final update
+                break
+                
+            time.sleep(0.2)  # Update every 200ms for real-time feel
+        
+        # Send close event
+        yield f"data: {json.dumps({'type': 'closed', 'upload_id': upload_id})}\n\n"
+    
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Cache-Control'
+        }
+    )
+
+@app.route('/delete-recording', methods=['POST'])
+def delete_recording():
+    """Delete a recording file"""
+    data = request.get_json()
+    file_path = data.get('file_path')
+    if not file_path or not os.path.isfile(file_path):
+        return jsonify({'error': 'Recording file not found.'}), 400
+    try:
+        if safe_remove_file(file_path):
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Failed to delete file'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Failed to delete: {e}'}), 500
 
 # Web viewer functions
 def is_port_available(port):
