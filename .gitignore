@@ -26,13 +26,14 @@ MANIFEST
 *.manifest
 *.spec.bak
 
-# Build directories (but keep .spec files)
-windows/build/
-windows/dist/
-linux/build/
-linux/dist/
-macos/build/
-macos/dist/
+# Local build directories and files (CI/CD handles building)
+windows/
+linux/
+macos/
+*.spec
+build_*.sh
+build_*.bat
+cleanup_*.sh
 
 # Virtual environments
 .env
