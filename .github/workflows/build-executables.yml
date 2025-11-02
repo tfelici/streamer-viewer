@@ -63,91 +63,11 @@ jobs:
         pip install Flask requests requests-toolbelt Pillow pyinstaller
         pip install pywebview pymediainfo
 
-    - name: Create PyInstaller spec file
-      run: |
-        python -c "
-        spec_content = '''# -*- mode: python ; coding: utf-8 -*-
-        import sys
-        from pathlib import Path
-
-        block_cipher = None
-
-        a = Analysis(
-            [\"main.py\"],
-            pathex=[],
-            binaries=[],
-            datas=[
-                (\"templates\", \"templates\"),
-                (\"static\", \"static\"),
-            ],
-            hiddenimports=[
-                \"pymediainfo\",
-                \"webview\",
-                \"webview.platforms.gtk\",
-                \"webview.platforms.qt\",
-                \"webview.platforms.cocoa\",
-                \"webview.platforms.cef\",
-                \"gi\",
-                \"gi.repository\",
-                \"gi.repository.Gtk\",
-                \"gi.repository.WebKit2\",
-                \"pkg_resources.py2_warn\",
-            ],
-            hookspath=[],
-            hooksconfig={},
-            runtime_hooks=[],
-            excludes=[],
-            win_no_prefer_redirects=False,
-            win_private_assemblies=False,
-            cipher=block_cipher,
-            noarchive=False,
-        )
-
-        pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-        exe = EXE(
-            pyz,
-            a.scripts,
-            a.binaries,
-            a.zipfiles,
-            a.datas,
-            [],
-            name=\"StreamerViewer\",
-            debug=False,
-            bootloader_ignore_signals=False,
-            strip=False,
-            upx=True,
-            upx_exclude=[],
-            runtime_tmpdir=None,
-            console=False if sys.platform != \"win32\" else True,
-            disable_windowed_traceback=False,
-            argv_emulation=False,
-            target_arch=None,
-            codesign_identity=None,
-            entitlements_file=None,
-        )
-
-        # macOS app bundle
-        if sys.platform == \"darwin\":
-            app = BUNDLE(
-                exe,
-                name=\"StreamerViewer.app\",
-                icon=None,
-                bundle_identifier=\"com.streamerviewer.app\",
-                info_plist={
-                    \"NSHighResolutionCapable\": \"True\",
-                    \"NSRequiresAquaSystemAppearance\": \"False\",
-                },
-            )
-        '''
-        with open('StreamerViewer.spec', 'w', encoding='utf-8') as f:
-            f.write(spec_content)
-        print('StreamerViewer.spec file created successfully')
-        "
-
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller StreamerViewer.spec
+        pyinstaller --onefile --windowed --name StreamerViewer --add-data "templates:templates" --add-data "static:static" --hidden-import=pymediainfo --hidden-import=webview main.py
+
+
 
     - name: Prepare artifacts (Linux/Windows)
       if: matrix.platform != 'macos'
