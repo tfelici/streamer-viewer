@@ -1,35 +1,59 @@
 # Streamer Viewer
 
-A standalone Python executable for viewing GPS tracks with synchronized video playback from the RPI Streamer project.
+A comprehensive standalone Python application for viewing GPS tracks with synchronized video playback AND uploading recordings from the RPI Streamer project. This application combines both viewing and upload functionality in a single, user-friendly interface.
 
 ## Features
 
-- **GPS Track Visualization**: Display GPS tracks stored in `../streamerData/tracks/` as lines on an interactive map using Leaflet.js
-- **Video Synchronization**: Show videos from `../streamerData/recordings/webcam/` synchronized with GPS track timeline
-- **Interactive Playback**: Timeline slider with play/pause controls and variable speed playback
-- **Automatic Matching**: Automatically finds and matches video files with GPS tracks based on timestamps
-- **Standalone Executable**: No Python installation required for end users
+### 🗺️ GPS Track Visualization
+- **Interactive Maps**: Display GPS tracks as lines on Leaflet.js maps with OpenStreetMap tiles
+- **Track Management**: Browse, view, and delete GPS tracks with an intuitive interface
+- **Real-time Playback**: Timeline slider with play/pause controls and variable speed playback
+- **Video Synchronization**: Synchronized video playback with GPS position tracking
+
+### 📡 Upload & Sync Functionality
+- **Server Upload**: Upload recordings directly to your RPI Streamer server
+- **Progress Monitoring**: Real-time upload progress with cancel capability
+- **Bulk Operations**: Select and upload multiple recordings simultaneously
+- **Server Integration**: Seamless integration with Streamer Admin backend
+
+### 🎨 Modern Interface
+- **Font Awesome Icons**: Beautiful, offline-compatible icon system
+- **Responsive Design**: Works perfectly on desktop and mobile devices
+- **Gradient Themes**: Modern CSS styling with smooth animations
+- **Intuitive Navigation**: Easy switching between viewing and uploading modes
+
+### 🚀 Deployment
+- **Standalone Executable**: Single-file Windows executable (~19MB)
+- **No Dependencies**: No Python installation required for end users
+- **Offline Compatible**: All assets bundled for complete offline functionality
 
 ## Directory Structure
 
-The application expects the following directory structure:
 ```
 Streamer Viewer/
-├── main.py                 # Main application
-├── requirements.txt        # Python dependencies
-├── templates/             # HTML templates
-│   ├── index.html         # Track list page
-│   └── viewer.html        # Track viewer page
-├── static/
-│   └── style.css          # Application styles
-├── streamerData/          # Data directory
-│   ├── tracks/            # GPS track files (*.tsv)
+├── main.py                          # Main Flask application
+├── requirements.txt                 # Python dependencies
+├── templates/                       # HTML templates
+│   ├── index.html                   # Track list & navigation
+│   ├── viewer.html                  # GPS track viewer with maps
+│   └── uploader.html                # Recording upload interface
+├── static/                          # Static assets
+│   ├── style.css                    # Main application styles
+│   ├── css/
+│   │   └── fontawesome-minimal.css  # Offline Font Awesome icons
+│   └── webfonts/                    # Font files
+│       ├── fa-solid-900.woff2       # Web font (optimized)
+│       └── fa-solid-900.ttf         # Fallback font
+├── streamerData/                    # Data directory
+│   ├── tracks/                      # GPS track files (*.tsv)
 │   └── recordings/
-│       └── webcam/        # Video files (*.mp4)
-└── windows/
-    ├── build_standalone.bat
-    ├── StreamerViewer_onefile.spec
-    └── version_info.txt
+│       └── webcam/                  # Video files (*.mp4)
+└── windows/                         # Build system
+    ├── build_standalone.bat         # Build script
+    ├── StreamerViewer_onefile.spec  # PyInstaller spec
+    ├── version_info.txt             # Version metadata
+    └── dist/
+        └── StreamerViewer.exe       # Final executable
 ```
 
 ## Data Sources
@@ -46,8 +70,32 @@ timestamp	latitude	longitude	altitude	accuracy	altitudeAccuracy	heading	speed
 
 ## Usage
 
-1. **Development**: Run `python main.py`
-2. **Standalone**: Build executable with `windows/build_standalone.bat`
+### 🖥️ Running the Application
+
+**Development Mode:**
+```bash
+python main.py
+```
+Opens webview window at `http://127.0.0.1:5001`
+
+**Standalone Executable:**
+```bash
+cd windows
+build_standalone.bat
+```
+Creates `windows/dist/StreamerViewer.exe`
+
+### 🧭 Navigation
+
+1. **Main Page**: Browse GPS tracks, switch between viewing and uploading
+2. **View Tracks**: Click track entries to view on interactive maps with video sync
+3. **Upload Recordings**: Select files, monitor upload progress, sync to server
+
+### 🔧 Configuration
+
+Set your server URL in the uploader interface:
+- Default: `https://gyropilots.com/streameradmin/`
+- Custom servers supported for private deployments
 
 ## Building Standalone Executable
 
@@ -61,9 +109,20 @@ The executable will be created in `windows/dist/StreamerViewer_Standalone.exe`
 
 ## Dependencies
 
-- Flask (web framework)
-- pywebview (desktop app wrapper)
-- pyinstaller (for building executables)
+### Core Framework
+- **Flask**: Web framework and routing
+- **pywebview**: Desktop application wrapper
+- **PyInstaller**: Executable building
+
+### Upload Functionality  
+- **requests**: HTTP client for server communication
+- **requests-toolbelt**: Multipart upload with progress tracking
+- **pymediainfo**: Media file metadata extraction
+
+### Frontend Assets
+- **Leaflet.js**: Interactive mapping (CDN)
+- **Font Awesome**: Icon system (bundled offline)
+- **OpenStreetMap**: Map tile provider
 
 ## How It Works
 
@@ -80,14 +139,65 @@ The application uses a built-in web browser (pywebview) and is compatible with m
 - HTML5 video for playback
 - CSS Grid and Flexbox for responsive layout
 
-## File Size
+## Technical Details
 
-The standalone executable is optimized for size and should be comparable to the Streamer Uploader (~16MB).
+### Performance
+- **Executable Size**: ~19MB (includes all dependencies and assets)
+- **Font Assets**: Minimal Font Awesome build (~148KB vs 600KB+ full version)
+- **Offline Ready**: All assets bundled for complete offline functionality
+
+### API Endpoints
+- `GET /` - Main navigation page
+- `GET /uploader` - Upload interface  
+- `GET /view/<track_id>` - Track viewer with maps
+- `POST /upload_recording` - File upload handler
+- `GET /upload_progress` - Server-Sent Events progress stream
+
+### Browser Compatibility
+- Modern web standards (ES6+, CSS Grid, Flexbox)
+- HTML5 video and canvas support
+- WebView2 engine on Windows
 
 ## Related Projects
 
-This application is part of the RPI Streamer ecosystem:
-- **RPI Streamer**: Records GPS tracks and videos
-- **Streamer Uploader**: Uploads recordings to server
-- **Streamer Viewer**: Views tracks and videos (this application)
-- **Streamer Admin**: Server administration
+This application **replaces and combines** functionality from:
+- ~~**Streamer Uploader**~~ *(integrated into this app)*
+- **Streamer Viewer** *(this application - now comprehensive)*
+
+**RPI Streamer Ecosystem:**
+- **RPI Streamer**: Records GPS tracks and videos on Raspberry Pi
+- **Streamer Admin**: Server-side administration and API backend  
+- **Streamer Viewer**: Complete client application (viewing + uploading)
+
+## Migration Notes
+
+**From Streamer Uploader**: All upload functionality has been integrated. The separate Streamer Uploader project is deprecated and can be safely removed.
+
+## Screenshots
+
+### Main Interface
+- 🗺️ **Track List**: Browse GPS tracks with icons and modern styling
+- 📡 **Upload Tab**: Drag-and-drop file upload with progress monitoring
+- 🧭 **Navigation**: Seamless switching between viewing and uploading modes
+
+### Track Viewer
+- 📍 **Interactive Maps**: Real-time GPS position tracking on OpenStreetMap
+- 🎥 **Video Sync**: Timeline scrubbing with synchronized video playback
+- ⏯️ **Controls**: Play/pause, speed adjustment, and timeline navigation
+
+## Version History
+
+- **v2.0.0**: Major integration release
+  - Merged Streamer Uploader functionality
+  - Added Font Awesome icon system (offline)
+  - Enhanced UI with gradients and animations
+  - Improved navigation and user experience
+  
+- **v1.x**: Initial GPS track viewer releases
+
+## Support
+
+For issues, feature requests, or questions:
+- **Repository**: https://github.com/tfelici/streamer-viewer
+- **Issues**: Use GitHub Issues for bug reports
+- **Documentation**: See this README and inline code comments
