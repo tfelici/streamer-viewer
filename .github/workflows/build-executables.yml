@@ -438,32 +438,59 @@ jobs:
         mkdir -p linux/dist
         mkdir -p macos/dist
 
+    - name: List downloaded artifacts (Debug)
+      run: |
+        echo "📂 Downloaded artifacts structure:"
+        find build-artifacts -type f -ls || ls -la build-artifacts/*/
+
     - name: Copy executables to correct locations
       run: |
         # Copy Windows executable
-        if [ -f "build-artifacts/StreamerViewer-windows/StreamerViewer.exe" ]; then
-          cp "build-artifacts/StreamerViewer-windows/StreamerViewer.exe" "windows/dist/StreamerViewer.exe"
+        if [ -f "build-artifacts/StreamerViewer-windows/StreamerViewer-windows.exe" ]; then
+          cp "build-artifacts/StreamerViewer-windows/StreamerViewer-windows.exe" "windows/dist/StreamerViewer.exe"
           echo "✅ Windows executable copied"
+        elif [ -f "build-artifacts/StreamerViewer-windows/StreamerViewer.exe" ]; then
+          cp "build-artifacts/StreamerViewer-windows/StreamerViewer.exe" "windows/dist/StreamerViewer.exe"
+          echo "✅ Windows executable copied (alt path)"
         else
           echo "⚠️  Windows executable not found in artifacts"
+          echo "Contents of StreamerViewer-windows artifact:"
+          ls -la "build-artifacts/StreamerViewer-windows/" || echo "Directory not found"
         fi
 
         # Copy Linux executable  
-        if [ -f "build-artifacts/StreamerViewer-linux/StreamerViewer" ]; then
-          cp "build-artifacts/StreamerViewer-linux/StreamerViewer" "linux/dist/StreamerViewer"
+        if [ -f "build-artifacts/StreamerViewer-linux/StreamerViewer-linux" ]; then
+          cp "build-artifacts/StreamerViewer-linux/StreamerViewer-linux" "linux/dist/StreamerViewer"
           chmod +x "linux/dist/StreamerViewer"
           echo "✅ Linux executable copied"
+        elif [ -f "build-artifacts/StreamerViewer-linux/StreamerViewer" ]; then
+          cp "build-artifacts/StreamerViewer-linux/StreamerViewer" "linux/dist/StreamerViewer"
+          chmod +x "linux/dist/StreamerViewer"
+          echo "✅ Linux executable copied (alt path)"
         else
           echo "⚠️  Linux executable not found in artifacts"
+          echo "Contents of StreamerViewer-linux artifact:"
+          ls -la "build-artifacts/StreamerViewer-linux/" || echo "Directory not found"
         fi
 
-        # Copy macOS executable
-        if [ -f "build-artifacts/StreamerViewer-macos/StreamerViewer" ]; then
-          cp "build-artifacts/StreamerViewer-macos/StreamerViewer" "macos/dist/StreamerViewer"
-          chmod +x "macos/dist/StreamerViewer"
-          echo "✅ macOS executable copied"
+        # Copy macOS executable (it's a zip file)
+        if [ -f "build-artifacts/StreamerViewer-macos/StreamerViewer-macos.zip" ]; then
+          # Extract the zip and copy the executable from the .app bundle
+          cd build-artifacts/StreamerViewer-macos/
+          unzip -q StreamerViewer-macos.zip
+          if [ -f "StreamerViewer.app/Contents/MacOS/StreamerViewer" ]; then
+            cp "StreamerViewer.app/Contents/MacOS/StreamerViewer" "../../macos/dist/StreamerViewer"
+            chmod +x "../../macos/dist/StreamerViewer"
+            cd ../..
+            echo "✅ macOS executable extracted and copied"
+          else
+            cd ../..
+            echo "⚠️  macOS executable not found in app bundle"
+          fi
         else
-          echo "⚠️  macOS executable not found in artifacts"
+          echo "⚠️  macOS executable zip not found in artifacts"
+          echo "Contents of StreamerViewer-macos artifact:"
+          ls -la "build-artifacts/StreamerViewer-macos/" || echo "Directory not found"
         fi
 
     - name: Check for changes
