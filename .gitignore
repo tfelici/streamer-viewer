@@ -66,14 +66,8 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Test data (keep structure but ignore large files)
-streamerData/tracks/*.tsv
-streamerData/recordings/**/*.mp4
-streamerData/recordings/**/*.avi
-
-# Keep directory structure
-!streamerData/tracks/.gitkeep
-!streamerData/recordings/webcam/.gitkeep
+# streamerData directory - completely exclude user data
+streamerData/
 
 # Generated splash preview (keep static splash.png)
 splash_preview.gif
