@@ -1,0 +1,237 @@
+name: Build Cross-Platform Executables
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            executable-suffix: ""
+            build-args: "--onefile --windowed"
+          - os: windows-latest
+            platform: windows
+            executable-suffix: ".exe"
+            build-args: "--onefile --windowed --console"
+          - os: macos-latest
+            platform: macos
+            executable-suffix: ""
+            build-args: "--onefile --windowed --osx-bundle-identifier=com.streamerviewer.app"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libgtk-3-dev \
+          libwebkit2gtk-4.0-dev \
+          libglib2.0-dev \
+          libcairo2-dev \
+          libgirepository1.0-dev
+
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install gtk+3 gobject-introspection
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Create PyInstaller spec file
+      run: |
+        cat > StreamerViewer.spec << 'EOF'
+        # -*- mode: python ; coding: utf-8 -*-
+        import sys
+        from pathlib import Path
+
+        block_cipher = None
+
+        a = Analysis(
+            ['main.py'],
+            pathex=[],
+            binaries=[],
+            datas=[
+                ('templates', 'templates'),
+                ('static', 'static'),
+            ],
+            hiddenimports=[
+                'pymediainfo',
+                'webview',
+                'webview.platforms.gtk',
+                'webview.platforms.qt',
+                'webview.platforms.cocoa',
+                'webview.platforms.cef',
+                'gi',
+                'gi.repository',
+                'gi.repository.Gtk',
+                'gi.repository.WebKit2',
+                'pkg_resources.py2_warn',
+            ],
+            hookspath=[],
+            hooksconfig={},
+            runtime_hooks=[],
+            excludes=[],
+            win_no_prefer_redirects=False,
+            win_private_assemblies=False,
+            cipher=block_cipher,
+            noarchive=False,
+        )
+
+        pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+        exe = EXE(
+            pyz,
+            a.scripts,
+            a.binaries,
+            a.zipfiles,
+            a.datas,
+            [],
+            name='StreamerViewer',
+            debug=False,
+            bootloader_ignore_signals=False,
+            strip=False,
+            upx=True,
+            upx_exclude=[],
+            runtime_tmpdir=None,
+            console=False if sys.platform != 'win32' else True,
+            disable_windowed_traceback=False,
+            argv_emulation=False,
+            target_arch=None,
+            codesign_identity=None,
+            entitlements_file=None,
+        )
+
+        # macOS app bundle
+        if sys.platform == 'darwin':
+            app = BUNDLE(
+                exe,
+                name='StreamerViewer.app',
+                icon=None,
+                bundle_identifier='com.streamerviewer.app',
+                info_plist={
+                    'NSHighResolutionCapable': 'True',
+                    'NSRequiresAquaSystemAppearance': 'False',
+                },
+            )
+        EOF
+
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller StreamerViewer.spec
+
+    - name: Prepare artifacts (Linux/Windows)
+      if: matrix.platform != 'macos'
+      run: |
+        mkdir -p artifacts
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          cp dist/StreamerViewer.exe artifacts/StreamerViewer-${{ matrix.platform }}${{ matrix.executable-suffix }}
+        else
+          cp dist/StreamerViewer artifacts/StreamerViewer-${{ matrix.platform }}
+        fi
+
+    - name: Prepare artifacts (macOS)
+      if: matrix.platform == 'macos'
+      run: |
+        mkdir -p artifacts
+        # Create a zip of the .app bundle for easier distribution
+        cd dist
+        zip -r ../artifacts/StreamerViewer-macos.zip StreamerViewer.app
+        cd ..
+
+    - name: List build output (Debug)
+      run: |
+        echo "Contents of dist directory:"
+        ls -la dist/
+        echo "Contents of artifacts directory:"
+        ls -la artifacts/ || echo "No artifacts directory"
+
+    - name: Upload executable artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: StreamerViewer-${{ matrix.platform }}
+        path: artifacts/*
+        retention-days: 90
+
+    - name: Get version from tag
+      if: startsWith(github.ref, 'refs/tags/v')
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+  create-release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: release-artifacts
+
+    - name: List downloaded artifacts (Debug)
+      run: |
+        echo "Downloaded artifacts:"
+        find release-artifacts -type f -ls
+
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Streamer Viewer ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ## Streamer Viewer ${{ steps.get_version.outputs.VERSION }}
+          
+          ### Downloads
+          - **Windows**: Download `StreamerViewer-windows.exe` 
+          - **Linux**: Download `StreamerViewer-linux` (make executable with `chmod +x`)
+          - **macOS**: Download `StreamerViewer-macos.zip` (extract and run the .app)
+          
+          ### Installation
+          1. Download the appropriate file for your operating system
+          2. For Linux: `chmod +x StreamerViewer-linux && ./StreamerViewer-linux`
+          3. For Windows: Double-click `StreamerViewer-windows.exe`
+          4. For macOS: Extract zip and double-click `StreamerViewer.app`
+          
+          ### System Requirements
+          - **Windows**: Windows 10 or later
+          - **Linux**: Ubuntu 20.04+ or equivalent (GTK3 support)
+          - **macOS**: macOS 10.15+ (Catalina or later)
+          
+          Built automatically with GitHub Actions.
+        files: release-artifacts/*/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

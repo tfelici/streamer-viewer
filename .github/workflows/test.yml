@@ -1,0 +1,70 @@
+name: Test Application
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} with Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install gtk+3
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Syntax check
+      run: |
+        python -m py_compile main.py
+
+    - name: Import test
+      run: |
+        python -c "
+        import sys
+        sys.path.insert(0, '.')
+        try:
+            import main
+            print('✅ Main module imports successfully')
+        except Exception as e:
+            print(f'❌ Import failed: {e}')
+            sys.exit(1)
+        "
+
+    - name: Dependency check
+      run: |
+        python -c "
+        import flask
+        import requests
+        import webview
+        print('✅ All core dependencies available')
+        "
