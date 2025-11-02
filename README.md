@@ -1,6 +1,6 @@
 # Streamer Viewer
 
-A comprehensive standalone Python application for viewing GPS tracks with synchronized video playback AND uploading recordings from the RPI Streamer project. This application combines both viewing and upload functionality in a single, user-friendly interface.
+A comprehensive standalone Python application for viewing GPS tracks with synchronized video playback and uploading recordings from the RPI Streamer project. This unified application provides complete GPS track management and recording upload functionality in a single, user-friendly interface.
 
 ## Features
 
@@ -10,7 +10,7 @@ A comprehensive standalone Python application for viewing GPS tracks with synchr
 - **Real-time Playback**: Timeline slider with play/pause controls and variable speed playback
 - **Video Synchronization**: Synchronized video playback with GPS position tracking
 
-### 📡 Upload & Sync Functionality
+### 📡 Recording Upload & Sync
 - **Server Upload**: Upload recordings directly to your RPI Streamer server
 - **Progress Monitoring**: Real-time upload progress with cancel capability
 - **Bulk Operations**: Select and upload multiple recordings simultaneously
@@ -20,7 +20,7 @@ A comprehensive standalone Python application for viewing GPS tracks with synchr
 - **Font Awesome Icons**: Beautiful, offline-compatible icon system
 - **Responsive Design**: Works perfectly on desktop and mobile devices
 - **Gradient Themes**: Modern CSS styling with smooth animations
-- **Intuitive Navigation**: Easy switching between viewing and uploading modes
+- **Intuitive Navigation**: Easy switching between track viewing and recording upload modes
 
 ### 🚀 Deployment
 - **Standalone Executable**: Single-file Windows executable (~19MB)
@@ -87,13 +87,13 @@ Creates `windows/dist/StreamerViewer.exe`
 
 ### 🧭 Navigation
 
-1. **Main Page**: Browse GPS tracks, switch between viewing and uploading
+1. **Main Page**: Browse GPS tracks, switch between viewing and recording upload modes
 2. **View Tracks**: Click track entries to view on interactive maps with video sync
 3. **Upload Recordings**: Select files, monitor upload progress, sync to server
 
 ### 🔧 Configuration
 
-Set your server URL in the uploader interface:
+Set your server URL in the upload interface:
 - Default: `https://gyropilots.com/streameradmin/`
 - Custom servers supported for private deployments
 
@@ -114,7 +114,7 @@ The executable will be created in `windows/dist/StreamerViewer_Standalone.exe`
 - **pywebview**: Desktop application wrapper
 - **PyInstaller**: Executable building
 
-### Upload Functionality  
+### Recording Upload Features
 - **requests**: HTTP client for server communication
 - **requests-toolbelt**: Multipart upload with progress tracking
 - **pymediainfo**: Media file metadata extraction
@@ -148,7 +148,7 @@ The application uses a built-in web browser (pywebview) and is compatible with m
 
 ### API Endpoints
 - `GET /` - Main navigation page
-- `GET /uploader` - Upload interface  
+- `GET /uploader` - Recording upload interface  
 - `GET /view/<track_id>` - Track viewer with maps
 - `POST /upload_recording` - File upload handler
 - `GET /upload_progress` - Server-Sent Events progress stream
@@ -160,25 +160,21 @@ The application uses a built-in web browser (pywebview) and is compatible with m
 
 ## Related Projects
 
-This application **replaces and combines** functionality from:
-- ~~**Streamer Uploader**~~ *(integrated into this app)*
-- **Streamer Viewer** *(this application - now comprehensive)*
-
 **RPI Streamer Ecosystem:**
 - **RPI Streamer**: Records GPS tracks and videos on Raspberry Pi
 - **Streamer Admin**: Server-side administration and API backend  
-- **Streamer Viewer**: Complete client application (viewing + uploading)
+- **Streamer Viewer**: Complete client application (viewing + recording upload)
 
-## Migration Notes
+## Architecture Notes
 
-**From Streamer Uploader**: All upload functionality has been integrated. The separate Streamer Uploader project is deprecated and can be safely removed.
+**Unified Application**: This application provides complete GPS track viewing and recording upload functionality in a single, comprehensive interface. All features are seamlessly integrated for optimal user experience.
 
 ## Screenshots
 
 ### Main Interface
 - 🗺️ **Track List**: Browse GPS tracks with icons and modern styling
-- 📡 **Upload Tab**: Drag-and-drop file upload with progress monitoring
-- 🧭 **Navigation**: Seamless switching between viewing and uploading modes
+- 📡 **Upload Interface**: Drag-and-drop file upload with progress monitoring
+- 🧭 **Navigation**: Seamless switching between track viewing and recording upload modes
 
 ### Track Viewer
 - 📍 **Interactive Maps**: Real-time GPS position tracking on OpenStreetMap
@@ -187,8 +183,8 @@ This application **replaces and combines** functionality from:
 
 ## Version History
 
-- **v2.0.0**: Major integration release
-  - Merged Streamer Uploader functionality
+- **v2.0.0**: Major feature expansion
+  - Integrated comprehensive recording upload functionality
   - Added Font Awesome icon system (offline)
   - Enhanced UI with gradients and animations
   - Improved navigation and user experience

@@ -376,7 +376,7 @@ def get_recording_files():
                 'name': display_name,
                 'size': size,
                 'location': 'Local',
-                'active': False,  # No active recordings in uploader
+                'active': False,  # No active recordings in upload interface
                 'duration': duration,
                 'timestamp': timestamp,
                 'domain': domain,
@@ -586,7 +586,7 @@ def delete_track():
 
 @app.route('/uploader')
 def uploader():
-    """Uploader page - Upload Recordings only"""
+    """Recording upload page - Upload recordings to server"""
     recording_files = get_recording_files()
     return render_template('uploader.html', 
                          recording_files=recording_files,
