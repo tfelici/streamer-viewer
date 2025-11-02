@@ -40,12 +40,11 @@ jobs:
         python-version: '3.13'
         cache: 'pip'
 
-    - name: Install system dependencies (Ubuntu) - Development libraries only
+    - name: Install system dependencies (Ubuntu) - Use system packages for GTK
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        # Install ONLY essential development libraries needed for compilation
-        # NO Python packages from system - we'll use pip exclusively
+        # Use system packages for ALL GTK-related libraries - more reliable for PyInstaller
         sudo apt-get install -y \
           libgtk-3-dev \
           libwebkit2gtk-4.1-dev \
@@ -57,22 +56,18 @@ jobs:
           gir1.2-glib-2.0 \
           gir1.2-gtk-3.0 \
           gir1.2-webkit2-4.1 \
+          python3-gi \
+          python3-gi-cairo \
           pkg-config \
           build-essential \
           python3-dev \
           libffi-dev
         
-        # Explicitly remove ALL system Python packages to avoid conflicts
+        # Only remove conflicting non-GTK packages, keep GTK system packages
         sudo apt-get remove -y \
-          python3-gi \
-          python3-gi-cairo \
-          python3-pyqt5 \
-          python3-pyqt5.qtwebengine \
           python3-cryptography \
           python3-requests \
-          python3-urllib3 \
-          python3-pil \
-          python3-flask || true
+          python3-urllib3 || true
         
         # Clean pip environment
         python -m pip install --upgrade pip setuptools wheel
@@ -198,30 +193,58 @@ jobs:
         print('Windows spec file created successfully')
         "
 
-    - name: Install Python GTK packages via pip only
+    - name: Use system GTK packages (no pip GTK packages)
       if: matrix.platform == 'linux'
       run: |
-        # Install GTK Python bindings exclusively via pip for consistency
-        echo "Installing GTK support via pip for clean PyInstaller bundling..."
+        # Use system GTK packages exclusively - more reliable for PyInstaller bundling
+        echo "Using system GTK packages for reliable PyInstaller bundling..."
         
-        # Set environment for successful compilation
-        export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
-        export CFLAGS="-I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include"
+        # Verify system packages are installed and accessible
+        python3 -c "import gi; print('✓ gi (GObject Introspection) available')"
+        python3 -c "import gi; gi.require_version('Gtk', '3.0'); from gi.repository import Gtk; print('✓ GTK3 available')"
+        python3 -c "import cairo; print('✓ pycairo available')" || echo "⚠️  pycairo not available via system packages"
         
-        # Install via pip for better PyInstaller compatibility
-        pip install pycairo
-        pip install PyGObject || echo "PyGObject failed - using system fallback approach"
+        # Only install non-GTK packages via pip
+        echo "System GTK packages verified - skipping pip GTK installation"
         
     - name: Create PyInstaller spec file (Linux with targeted GTK bundling)
       if: matrix.platform == 'linux'
       run: |
-        # Create minimal runtime hook for GTK (pip packages should be self-contained)
+        # Create runtime hook for system GTK packages
         mkdir -p hooks
         cat > hooks/hook-gi.py << 'EOF'
-        # Minimal runtime hook for GTK pip packages
-        # Since we're using pip exclusively, this should be minimal
+        # Runtime hook for system GTK packages
         import os
         import sys
+
+        # Add system library paths for GTK packages
+        gi_paths = [
+            '/usr/lib/python3/dist-packages',
+            '/usr/lib/python3.13/dist-packages', 
+            '/usr/local/lib/python3.13/dist-packages'
+        ]
+        
+        for path in gi_paths:
+            if path not in sys.path and os.path.exists(path):
+                sys.path.insert(0, path)
+                
+        # Set GI typelib path for system packages
+        gi_typelib_path = os.environ.get('GI_TYPELIB_PATH', '')
+        system_typelib_paths = [
+            '/usr/lib/x86_64-linux-gnu/girepository-1.0',
+            '/usr/lib/girepository-1.0',
+            '/usr/share/gir-1.0'
+        ]
+        
+        for path in system_typelib_paths:
+            if os.path.exists(path):
+                if gi_typelib_path:
+                    gi_typelib_path = f"{path}:{gi_typelib_path}"
+                else:
+                    gi_typelib_path = path
+                    
+        if gi_typelib_path:
+            os.environ['GI_TYPELIB_PATH'] = gi_typelib_path
         EOF
         
         python -c "
@@ -250,7 +273,12 @@ jobs:
         
         a = Analysis(
             ['main.py'],
-            pathex=['.'],
+            pathex=[
+                '.', 
+                '/usr/lib/python3/dist-packages',
+                '/usr/lib/python3.13/dist-packages',
+                '/usr/local/lib/python3.13/dist-packages'
+            ],
             binaries=[],
             datas=[
                 ('templates', 'templates'),
