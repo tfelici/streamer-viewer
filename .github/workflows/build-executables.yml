@@ -306,65 +306,64 @@ jobs:
     - name: Create PyInstaller spec file (Linux with targeted QT bundling)
       if: matrix.platform == 'linux'
       run: |
-        # Create runtime hook for system GTK packages
+        # Create runtime hook for system QT packages
         mkdir -p hooks
-        cat > hooks/hook-gi.py << 'EOF'
-        # Runtime hook for system GTK packages
+        cat > hooks/hook-qt.py << 'EOF'
+        # Runtime hook for system QT packages
         import os
         import sys
 
-        # Add system library paths for GTK packages - detect Python version dynamically
+        # Add system library paths for QT packages - detect Python version dynamically
         import sys
         python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
-        gi_paths = [
-            '/usr/lib/python3/dist-packages',  # System GTK packages
+        qt_paths = [
+            '/usr/lib/python3/dist-packages',  # System QT packages
             f'/home/runner/.local/lib/{python_version}/site-packages',  # User packages for detected version
         ]
         
-        for path in gi_paths:
+        for path in qt_paths:
             if path not in sys.path and os.path.exists(path):
                 sys.path.insert(0, path)
                 
-        # Set GI typelib path for system packages
-        gi_typelib_path = os.environ.get('GI_TYPELIB_PATH', '')
-        system_typelib_paths = [
-            '/usr/lib/x86_64-linux-gnu/girepository-1.0',
-            '/usr/lib/girepository-1.0',
-            '/usr/share/gir-1.0'
+        # Set QT plugin path for system packages
+        qt_plugin_path = os.environ.get('QT_PLUGIN_PATH', '')
+        system_qt_paths = [
+            '/usr/lib/x86_64-linux-gnu/qt5/plugins',
+            '/usr/lib/qt5/plugins',
+            '/usr/share/qt5/plugins'
         ]
         
-        for path in system_typelib_paths:
+        for path in system_qt_paths:
             if os.path.exists(path):
-                if gi_typelib_path:
-                    gi_typelib_path = f"{path}:{gi_typelib_path}"
+                if qt_plugin_path:
+                    qt_plugin_path = f"{path}:{qt_plugin_path}"
                 else:
-                    gi_typelib_path = path
+                    qt_plugin_path = path
                     
-        if gi_typelib_path:
-            os.environ['GI_TYPELIB_PATH'] = gi_typelib_path
+        if qt_plugin_path:
+            os.environ['QT_PLUGIN_PATH'] = qt_plugin_path
         EOF
         
         python -c "
         import os
         spec_content = '''# -*- mode: python ; coding: utf-8 -*-
-        # Targeted GTK bundling for pywebview support while minimizing size
+        # Targeted QT bundling for pywebview support while minimizing size
         from PyInstaller.utils.hooks import collect_submodules, collect_data_files
         
-        # Collect only essential GTK modules needed by pywebview
-        gi_submodules = [
-            'gi.repository.Gtk',
-            'gi.repository.GLib', 
-            'gi.repository.GObject',
-            'gi.repository.Gdk',
-            'gi.repository.WebKit2',
-            'gi.repository.Gio',
+        # Collect only essential QT modules needed by pywebview
+        qt_submodules = [
+            'PyQt5.QtCore',
+            'PyQt5.QtWidgets', 
+            'PyQt5.QtWebEngineWidgets',
+            'PyQt5.QtWebChannel',
+            'PyQt5.QtGui',
         ]
         
-        # Collect GTK typelib data files (needed for gi.repository)
+        # Collect QT data files (plugins, etc.)
         try:
-            gi_datas = collect_data_files('gi.repository', includes=['*.typelib'])
+            qt_datas = collect_data_files('PyQt5', includes=['*.so', '*.dll'])
         except:
-            gi_datas = []
+            qt_datas = []
         
         block_cipher = None
         
@@ -376,7 +375,7 @@ jobs:
             ['main.py'],
             pathex=[
                 '.', 
-                '/usr/lib/python3/dist-packages',  # System GTK packages location
+                '/usr/lib/python3/dist-packages',  # System QT packages location
                 f'/home/runner/.local/lib/{python_version}/site-packages',  # User-installed packages for detected version
             ],
             binaries=[],
@@ -384,44 +383,23 @@ jobs:
                 ('templates', 'templates'),
                 ('static', 'static'),
                 ('splash.png', '.'),
-            ] + gi_datas,
+            ] + qt_datas,
             hiddenimports=[
                 'webview',
-                'webview.platforms.gtk',
+                'webview.platforms.qt',
                 'pymediainfo',
                 'flask',
                 'requests',
                 'pyi_splash',
-                # Core GTK and GObject bindings
-                'gi',
-                'gi.repository',
-                'gi._gi',
-                'gi._gi_cairo',
-                'gi._constants',
-                'gi._error',
-                'gi._option',
-                'gi._propertyhelper',
-                'gi._signalhelper',
-                'gi.docstring',
-                'gi.importer',
-                'gi.module',
-                'gi.overrides',
-                'gi.types',
-                # Essential repository modules
-                'gi.repository.GLib',
-                'gi.repository.GObject', 
-                'gi.repository.Gio',
-                'gi.repository.Gtk',
-                'gi.repository.Gdk',
-                'gi.repository.WebKit2',
-                'gi.repository.Soup',
-                'gi.repository.Pango',
-                'gi.repository.PangoCairo',
-                'gi.repository.GdkPixbuf',
-                # Cairo support
-                'cairo',
-                'pycairo',
-                '_cairo',
+                # Core QT bindings
+                'PyQt5',
+                'PyQt5.QtCore',
+                'PyQt5.QtWidgets',
+                'PyQt5.QtWebEngineWidgets',
+                'PyQt5.QtWebChannel',
+                'PyQt5.QtGui',
+                'PyQt5.QtNetwork',
+                'PyQt5.sip',
                 # Fix setuptools/pkg_resources dependencies
                 'jaraco.text',
                 'jaraco.functools', 
@@ -431,10 +409,10 @@ jobs:
                 'packaging.version',
                 'packaging.specifiers',
                 'packaging.requirements',
-            ],
+            ] + qt_submodules,
             hookspath=['hooks'],
             hooksconfig={},
-            runtime_hooks=['hooks/hook-gi.py'],
+            runtime_hooks=['hooks/hook-qt.py'],
             excludes=[
                 'tkinter', 
                 'matplotlib', 
@@ -450,8 +428,8 @@ jobs:
                 'kivy',
                 'PySide2',
                 'PySide6',
-                'PyQt5',  # Exclude Qt to focus on GTK
-                'qtpy',
+                'gi',  # Exclude GTK to focus on QT
+                'gtk',
 
             ],
             win_no_prefer_redirects=False,
@@ -499,7 +477,7 @@ jobs:
         '''
         with open('StreamerViewer.spec', 'w') as f:
             f.write(spec_content)
-        print('Linux spec file created successfully with GUI bundling')
+        print('Linux spec file created successfully with QT bundling')
         "
 
     - name: Build executable with PyInstaller (Windows with splash)
