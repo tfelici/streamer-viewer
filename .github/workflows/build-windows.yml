@@ -35,9 +35,6 @@ jobs:
         --add-data "static;static" `
         --add-data "splash.png;." `
         --splash splash.png `
-        --splash-text-pos "10,300" `
-        --splash-text-size 14 `
-        --splash-text-color white `
         --hidden-import webview `
         --hidden-import webview.platforms.winforms `
         --hidden-import webview.platforms.cef `
