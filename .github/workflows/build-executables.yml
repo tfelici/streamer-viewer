@@ -259,23 +259,6 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         echo "Creating PyInstaller spec for browser-based Flask app..."
-        qt_plugin_path = os.environ.get('QT_PLUGIN_PATH', '')
-        system_qt_paths = [
-            '/usr/lib/x86_64-linux-gnu/qt5/plugins',
-            '/usr/lib/qt5/plugins',
-            '/usr/share/qt5/plugins'
-        ]
-        
-        for path in system_qt_paths:
-            if os.path.exists(path):
-                if qt_plugin_path:
-                    qt_plugin_path = f"{path}:{qt_plugin_path}"
-                else:
-                    qt_plugin_path = path
-                    
-        if qt_plugin_path:
-            os.environ['QT_PLUGIN_PATH'] = qt_plugin_path
-        
         python -c "
         import os
         spec_content = '''# -*- mode: python ; coding: utf-8 -*-
