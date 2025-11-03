@@ -359,9 +359,17 @@ jobs:
             'PyQt5.QtGui',
         ]
         
-        # Collect QT data files (plugins, etc.)
+        # Collect only essential QT data files with strict filtering
         try:
-            qt_datas = collect_data_files('PyQt5', includes=['*.so', '*.dll'])
+            qt_datas = collect_data_files('PyQt5', includes=['*.so'])
+            # Filter to only include absolutely essential Qt libraries
+            essential_qt_files = []
+            for name, path in qt_datas:
+                if any(essential in path.lower() for essential in [
+                    'qtcore', 'qtgui', 'qtwidgets', 'qtwebengine', 'qtwebchannel'
+                ]):
+                    essential_qt_files.append((name, path))
+            qt_datas = essential_qt_files
         except:
             qt_datas = []
         
@@ -382,6 +390,7 @@ jobs:
             datas=[
                 ('templates', 'templates'),
                 ('static', 'static'),
+                ('splash.png', '.'),
             ] + qt_datas,
             hiddenimports=[
                 'webview',
@@ -389,25 +398,16 @@ jobs:
                 'pymediainfo',
                 'flask',
                 'requests',
-                # Core QT bindings
-                'PyQt5',
+                # Minimal QT - let system provide the rest
                 'PyQt5.QtCore',
                 'PyQt5.QtWidgets',
                 'PyQt5.QtWebEngineWidgets',
-                'PyQt5.QtWebChannel',
-                'PyQt5.QtGui',
-                'PyQt5.QtNetwork',
-                'PyQt5.sip',
                 # Fix setuptools/pkg_resources dependencies
                 'jaraco.text',
                 'jaraco.functools', 
                 'jaraco.collections',
                 'importlib_metadata',
-                'packaging',
-                'packaging.version',
-                'packaging.specifiers',
-                'packaging.requirements',
-            ] + qt_submodules,
+            ],
             hookspath=['hooks'],
             hooksconfig={},
             runtime_hooks=['hooks/hook-qt.py'],
@@ -428,7 +428,50 @@ jobs:
                 'PySide6',
                 'gi',  # Exclude GTK to focus on QT
                 'gtk',
-
+                # Exclude large Qt modules we don't need
+                'PyQt5.Qt',
+                'PyQt5.QtSql',
+                'PyQt5.QtTest',
+                'PyQt5.QtXml',
+                'PyQt5.QtSvg',
+                'PyQt5.QtMultimedia',
+                'PyQt5.QtMultimediaWidgets', 
+                'PyQt5.QtOpenGL',
+                'PyQt5.QtPositioning',
+                'PyQt5.QtPrintSupport',
+                'PyQt5.QtQml',
+                'PyQt5.QtQuick',
+                'PyQt5.QtQuickWidgets',
+                'PyQt5.QtSensors',
+                'PyQt5.QtSerialPort',
+                'PyQt5.QtWebKit',
+                'PyQt5.QtWebKitWidgets',
+                'PyQt5.QtWinExtras',
+                'PyQt5.QtX11Extras',
+                'PyQt5.QtBluetooth',
+                'PyQt5.QtDesigner',
+                'PyQt5.QtHelp',
+                'PyQt5.QtLocation',
+                'PyQt5.QtMacExtras',
+                'PyQt5.QtNfc',
+                'PyQt5.QtWebChannel',
+                # Additional size reductions
+                'sqlite3',
+                'unicodedata',
+                'email',
+                'xml',
+                'xmlrpc',
+                'urllib3.packages',
+                'distutils',
+                'lib2to3',
+                'pydoc_data',
+                'test',
+                'tests',
+                'unittest',
+                'asyncio',
+                'multiprocessing',
+                'concurrent.futures',
+                'wsgiref',
             ],
             win_no_prefer_redirects=False,
             win_private_assemblies=False,
@@ -448,9 +491,12 @@ jobs:
             name='StreamerViewer',
             debug=False,
             bootloader_ignore_signals=False,
-            strip=False,
-            upx=False,
-            upx_exclude=[],
+            strip=True,
+            upx=True,
+            upx_exclude=[
+                'libQt5WebEngine*',  # Don't compress Qt WebEngine (can cause issues)
+                'libQt5WebEngineCore*',
+            ],
             runtime_tmpdir=None,
             console=False,
             disable_windowed_traceback=False,
@@ -470,11 +516,21 @@ jobs:
       run: |
         pyinstaller StreamerViewer.spec --noconfirm --clean
 
-    - name: Build executable with PyInstaller (Linux with splash and GUI bundling)
+    - name: Install UPX for compression (Linux)
       if: matrix.platform == 'linux'
       run: |
-        # Ensure we're using system python3 with user-installed PyInstaller
-        python3 -m PyInstaller StreamerViewer.spec --noconfirm --clean
+        echo "Installing UPX for executable compression..."
+        sudo apt-get install -y upx-ucl
+
+    - name: Build executable with PyInstaller (Linux optimized size)
+      if: matrix.platform == 'linux'
+      run: |
+        echo "Building size-optimized Linux executable with Qt bundling..."
+        python3 -m PyInstaller StreamerViewer.spec --noconfirm --clean --strip
+        
+        # Compress with UPX for smaller size
+        echo "Compressing executable with UPX..."
+        upx --best --lzma dist/StreamerViewer || echo "UPX compression failed, continuing..."
 
     - name: Build executable with PyInstaller (macOS optimized)
       if: matrix.platform == 'macos'
@@ -629,7 +685,7 @@ jobs:
           
           ### System Requirements
           - **Windows**: Windows 10 or later
-          - **Linux**: Ubuntu 20.04+ or equivalent (GTK3 support)
+          - **Linux**: Ubuntu 18.04+ or equivalent (Qt5 libraries bundled)
           - **macOS**: macOS 10.15+ (Catalina or later)
           
           Built automatically with GitHub Actions.
