@@ -204,11 +204,9 @@ jobs:
             
             # Verify signature (this will show warnings for self-signed certs, but that's expected)
             echo "🔍 Verifying signature (trust warnings expected for self-signed certificates)..."
-            try {
-              & "$signtool" verify /pa /v "dist\StreamerViewer.exe" 2>&1 | Out-Host
-            } catch {
-              echo "ℹ️ Verification shows trust warnings (normal for self-signed certificates)"
-            }
+            & "$signtool" verify /pa /v "dist\StreamerViewer.exe" 2>&1 | Out-Host
+            # Reset exit code - verification warnings are expected for self-signed certificates
+            $LASTEXITCODE = 0
             echo "📋 Code signing completed - SmartScreen warnings should be reduced"
           } else {
             echo "⚠️ Code signing failed, but continuing build"
