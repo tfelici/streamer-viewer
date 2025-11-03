@@ -26,7 +26,8 @@ jobs:
     name: Create Release
     needs: [build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Create releases for version tags OR main/develop branch pushes
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     
     steps:
     - name: Checkout code
@@ -42,164 +43,69 @@ jobs:
         echo "Downloaded artifacts:"
         find release-artifacts -type f -ls
 
-    - name: Get version from tag
+    - name: Get version and branch info
       id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      run: |
+        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "IS_TAG=true" >> $GITHUB_OUTPUT
+          echo "BRANCH=" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == refs/heads/develop ]]; then
+          echo "VERSION=latest-develop" >> $GITHUB_OUTPUT
+          echo "IS_TAG=false" >> $GITHUB_OUTPUT
+          echo "BRANCH=develop" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+          echo "VERSION=latest-main" >> $GITHUB_OUTPUT
+          echo "IS_TAG=false" >> $GITHUB_OUTPUT
+          echo "BRANCH=main" >> $GITHUB_OUTPUT
+        fi
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        name: Streamer Viewer ${{ steps.get_version.outputs.VERSION }}
-        body: |
-          ## Streamer Viewer ${{ steps.get_version.outputs.VERSION }}
-          
-          ### Downloads
-          - **Windows**: Download `StreamerViewer-windows.exe` 
-          - **Linux**: Download `StreamerViewer-linux` (make executable with `chmod +x`)
-          - **macOS**: Download `StreamerViewer-macos` (make executable with `chmod +x`)
-          
-          ### Installation
-          1. Download the appropriate file for your operating system
-          2. For Linux: `chmod +x StreamerViewer-linux && ./StreamerViewer-linux`
-          3. For Windows: Double-click `StreamerViewer-windows.exe`
-          4. For macOS: `chmod +x StreamerViewer-macos && ./StreamerViewer-macos`
-          
-          ### System Requirements
-          - **Windows**: Windows 10 or later
-          - **Linux**: Ubuntu 18.04+ or equivalent (browser-based, no GUI libraries needed)
-          - **macOS**: macOS 10.15+ (Catalina or later, browser-based)
-          
-          Built automatically with GitHub Actions.
-        files: release-artifacts/*/*
-        draft: false
-        prerelease: false
+    - name: Delete existing branch release if it exists
+      if: steps.get_version.outputs.IS_TAG == 'false'
+      run: |
+        # Delete existing release tag and release (will be recreated)
+        gh release delete ${{ steps.get_version.outputs.VERSION }} --yes || echo "Release ${{ steps.get_version.outputs.VERSION }} does not exist"
+        git tag -d ${{ steps.get_version.outputs.VERSION }} || echo "Tag ${{ steps.get_version.outputs.VERSION }} does not exist locally"
+        git push --delete origin ${{ steps.get_version.outputs.VERSION }} || echo "Tag ${{ steps.get_version.outputs.VERSION }} does not exist on remote"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  commit-executables:
-    name: Commit Executables for Installer Download
-    needs: [build-windows, build-linux, build-macos]
-    runs-on: ubuntu-latest
-    # Only commit on develop and main branches for installer use
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') && always()
-    
-    permissions:
-      contents: write
-      actions: read
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - name: Create/Update Release
+      uses: softprops/action-gh-release@v1
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 0
-
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: build-artifacts
-
-    - name: Prepare executable directories for installer download
-      run: |
-        # Create platform-specific directories for installer download paths
-        mkdir -p windows/dist
-        mkdir -p linux/dist
-        mkdir -p macos/dist
-
-    - name: Copy executables to installer download locations
-      run: |
-        # Copy Windows executable
-        if [ -f "build-artifacts/StreamerViewer-windows/StreamerViewer-windows.exe" ]; then
-          cp "build-artifacts/StreamerViewer-windows/StreamerViewer-windows.exe" "windows/dist/StreamerViewer.exe"
-          echo "✅ Windows executable ready for installer download"
-        elif [ -f "build-artifacts/StreamerViewer-windows/StreamerViewer.exe" ]; then
-          cp "build-artifacts/StreamerViewer-windows/StreamerViewer.exe" "windows/dist/StreamerViewer.exe"
-          echo "✅ Windows executable ready for installer download (alt path)"
-        else
-          echo "⚠️  Windows executable not found in artifacts"
-        fi
-
-        # Copy Linux executable  
-        if [ -f "build-artifacts/StreamerViewer-linux/StreamerViewer-linux" ]; then
-          cp "build-artifacts/StreamerViewer-linux/StreamerViewer-linux" "linux/dist/StreamerViewer"
-          chmod +x "linux/dist/StreamerViewer"
-          echo "✅ Linux executable ready for installer download"
-        elif [ -f "build-artifacts/StreamerViewer-linux/StreamerViewer" ]; then
-          cp "build-artifacts/StreamerViewer-linux/StreamerViewer" "linux/dist/StreamerViewer"
-          chmod +x "linux/dist/StreamerViewer"
-          echo "✅ Linux executable ready for installer download (alt path)"
-        else
-          echo "⚠️  Linux executable not found in artifacts"
-        fi
-
-        # Copy macOS executable (single file, not app bundle)
-        if [ -f "build-artifacts/StreamerViewer-macos/StreamerViewer-macos" ]; then
-          cp "build-artifacts/StreamerViewer-macos/StreamerViewer-macos" "macos/dist/StreamerViewer"
-          chmod +x "macos/dist/StreamerViewer"
-          echo "✅ macOS executable ready for installer download"
-        else
-          echo "⚠️  macOS executable not found in artifacts"
-        fi
-
-    - name: Check for executable availability
-      id: check_executables
-      run: |
-        # Check if executables exist for installer download
-        executables_found=false
-        
-        if [ -f "windows/dist/StreamerViewer.exe" ]; then
-          echo "✓ Windows executable available for installer download"
-          executables_found=true
-        fi
-        
-        if [ -f "linux/dist/StreamerViewer" ]; then
-          echo "✓ Linux executable available for installer download"
-          executables_found=true
-        fi
-        
-        if [ -f "macos/dist/StreamerViewer" ]; then
-          echo "✓ macOS executable available for installer download"
-          executables_found=true
-        fi
-        
-        if [ "$executables_found" = "true" ]; then
-          echo "executables_ready=true" >> $GITHUB_OUTPUT
-          echo "📦 Executables ready for installer download"
-        else
-          echo "executables_ready=false" >> $GITHUB_OUTPUT
-          echo "❌ No executables found for installer download"
-        fi
-
-    - name: Commit executables for installer download
-      if: steps.check_executables.outputs.executables_ready == 'true'
-      run: |
-        # Configure git
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        
-        # Add executables for installer download (force add to override .gitignore)
-        git add -f windows/dist/StreamerViewer.exe linux/dist/StreamerViewer macos/dist/StreamerViewer
-        
-        # Commit with build info for installer use
-        git commit -m "🤖 Update executables for installer download (build ${{ github.run_number }})" \
-                   -m "Built from: ${{ github.sha }}" \
-                   -m "Branch: ${{ github.ref_name }}" \
-                   -m "Purpose: RPI Streamer installer download paths"
-        
-        # Push to the current branch
-        git push origin ${{ github.ref_name }}
-        
-        echo "✅ Executables committed for installer download at:"
-        echo "   • windows/dist/StreamerViewer.exe"
-        echo "   • linux/dist/StreamerViewer" 
-        echo "   • macos/dist/StreamerViewer"
-
-    - name: Summary
-      run: |
-        echo "📦 Executable commit job completed"
-        echo "🎯 Purpose: Make executables available for RPI Streamer installer script"
-        echo "📋 Installer download paths:"
-        echo "   • Windows: https://github.com/tfelici/Streamer-Viewer/raw/${{ github.ref_name }}/windows/dist/StreamerViewer.exe"
-        echo "   • Linux: https://github.com/tfelici/Streamer-Viewer/raw/${{ github.ref_name }}/linux/dist/StreamerViewer"
-        echo "   • macOS: https://github.com/tfelici/Streamer-Viewer/raw/${{ github.ref_name }}/macos/dist/StreamerViewer"
-        echo "💡 Users can also download from GitHub Actions artifacts for manual use"
+        name: ${{ steps.get_version.outputs.IS_TAG == 'true' && format('Streamer Viewer {0}', steps.get_version.outputs.VERSION) || steps.get_version.outputs.BRANCH == 'develop' && 'Latest Development Build (Develop Branch)' || 'Latest Stable Build (Main Branch)' }}
+        tag_name: ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ${{ steps.get_version.outputs.IS_TAG == 'true' && format('## Streamer Viewer {0}', steps.get_version.outputs.VERSION) || steps.get_version.outputs.BRANCH == 'develop' && '🚧 **Latest Development Build (Develop Branch)**' || '🚀 **Latest Stable Build (Main Branch)**' }}
+          
+          ${{ steps.get_version.outputs.BRANCH == 'develop' && '⚠️ **Warning**: This is a development build from the develop branch. It may contain experimental features and should be used with the develop branch of RPI Streamer.' || '' }}
+          
+          ### Branch Compatibility
+          ${{ steps.get_version.outputs.BRANCH == 'develop' && '- 🔧 **Use with**: RPI Streamer develop branch' || steps.get_version.outputs.BRANCH == 'main' && '- ✅ **Use with**: RPI Streamer main branch (stable)' || '- 📦 **Stable release**: Compatible with tagged RPI Streamer versions' }}
+          ${{ steps.get_version.outputs.BRANCH == 'develop' && '- 🧪 **Status**: Experimental/Testing' || '- 🏆 **Status**: Production Ready' }}
+          
+          ### Quick Download Links
+          - **[Windows](https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-windows.exe)** - Double-click to run
+          - **[Linux](https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-linux)** - `chmod +x StreamerViewer-linux && ./StreamerViewer-linux`
+          - **[macOS](https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-macos)** - `chmod +x StreamerViewer-macos && ./StreamerViewer-macos`
+          
+          ### For Automated Scripts
+          ```bash
+          # Download from this specific release
+          wget https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-linux
+          wget https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-windows.exe  
+          wget https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-macos
+          ```
+          
+          ### System Requirements
+          - **Windows**: Windows 10 or later
+          - **Linux**: Ubuntu 18.04+ or equivalent (browser-based, no additional GUI libraries needed)
+          - **macOS**: macOS 10.15+ (Catalina or later, browser-based)
+          
+          **Built from**: ${{ steps.get_version.outputs.BRANCH == 'develop' && format('develop branch commit {0}', github.sha) || steps.get_version.outputs.BRANCH == 'main' && format('main branch commit {0}', github.sha) || 'tagged release' }}
+          **Build date**: ${{ github.event.head_commit.timestamp }}
+        files: release-artifacts/*/*
+        draft: false
+        prerelease: ${{ steps.get_version.outputs.IS_TAG == 'false' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

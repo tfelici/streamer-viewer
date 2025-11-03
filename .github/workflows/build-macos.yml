@@ -6,11 +6,10 @@ on:
       artifact-name:
         description: "Name of the macOS artifact"
         value: "StreamerViewer-macos"
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
 
 jobs:
   build-macos:
-    name: Build macOS Executable
     runs-on: macos-latest
     
     steps:
@@ -21,88 +20,19 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.12'
-        cache: 'pip'
 
-    - name: Install Python dependencies
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install Flask requests requests-toolbelt Pillow pyinstaller
-        pip install pymediainfo
-        # Install jaraco dependencies explicitly to fix pkg_resources issues
-        pip install jaraco.text jaraco.functools jaraco.collections importlib-metadata
+        pip install -r requirements.txt
+        pip install pyinstaller
 
-    - name: Verify browser-based approach readiness
+    - name: Build executable
       run: |
-        echo "macOS will use browser-based approach - no additional GUI frameworks needed"
-        python -c "
-        import webbrowser
-        import flask
-        import requests
-        import pymediainfo
-        print('✓ All dependencies available for browser-based approach')
-        print('✓ webbrowser (stdlib)')
-        print('✓ Flask:', flask.__version__)
-        print('✓ requests:', requests.__version__)
-        print('✓ pymediainfo:', pymediainfo.__version__)
-        "
+        python -m PyInstaller StreamerViewer.spec
 
-    - name: Build executable with PyInstaller (browser-based)
-      run: |
-        pyinstaller --onefile --windowed --name StreamerViewer-macOS \
-          --add-data "templates:templates" \
-          --add-data "static:static" \
-          --hidden-import=pymediainfo \
-          --hidden-import=webbrowser \
-          --hidden-import=flask \
-          --hidden-import=requests \
-          --hidden-import=requests_toolbelt \
-          --exclude-module=webview \
-          --exclude-module=tkinter \
-          --exclude-module=matplotlib \
-          --exclude-module=numpy \
-          --exclude-module=scipy \
-          --exclude-module=pandas \
-          --exclude-module=IPython \
-          --exclude-module=jupyter \
-          --exclude-module=PyQt5 \
-          --exclude-module=PyQt6 \
-          --exclude-module=PySide2 \
-          --exclude-module=PySide6 \
-          --exclude-module=qtpy \
-          --exclude-module=gi \
-          main.py
-
-    - name: Create artifacts directory
-      run: |
-        python -c "import os; os.makedirs('artifacts', exist_ok=True)"
-
-    - name: Prepare macOS artifacts
-      run: |
-        python -c "
-        import shutil
-        import os
-        # Copy the single executable file (not an app bundle since we use --onefile)
-        shutil.copy('dist/StreamerViewer-macOS', 'artifacts/StreamerViewer-macos')
-        print('macOS executable copied to artifacts')
-        "
-
-    - name: List build output
-      run: |
-        python -c "
-        import os
-        print('Contents of artifacts directory:')
-        try:
-            for item in os.listdir('artifacts'):
-                item_path = os.path.join('artifacts', item)
-                size = os.path.getsize(item_path) if os.path.isfile(item_path) else 'DIR'
-                print(f'  {item} ({size} bytes)' if size != 'DIR' else f'  {item}/ (DIR)')
-        except Exception as e:
-            print(f'  No artifacts directory or error: {e}')
-        "
-
-    - name: Upload macOS executable artifact
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: StreamerViewer-macos
-        path: artifacts/*
-        retention-days: 90
+        path: dist/StreamerViewer
