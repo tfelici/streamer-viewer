@@ -80,8 +80,11 @@ jobs:
           libmediainfo0v5 \
           libmediainfo-dev
         
-        # Install pymediainfo system-wide via pip
+        # Install pymediainfo system-wide via pip (ensure it's in the right path)
         sudo python3 -m pip install pymediainfo
+        
+        # Also install in user directory as fallback for PyInstaller
+        python3 -m pip install --user pymediainfo
         
         echo "Current Python: $(python --version)"
         echo "Python path: $(which python)"
@@ -105,9 +108,13 @@ jobs:
         python3 -m pip install --user pyinstaller  # Not available as system package
         python3 -m pip install --user requests-toolbelt  # Extension, not in system
         
-        # Verify pymediainfo is available (installed system-wide above)
+        # Verify pymediainfo is available (should be installed both system-wide and user)
         echo "Verifying pymediainfo installation..."
-        python3 -c "import pymediainfo; print('✓ pymediainfo available system-wide')" || echo "✗ pymediainfo not available"
+        python3 -c "import pymediainfo; print('✓ pymediainfo available:', pymediainfo.__file__)" || echo "✗ pymediainfo not available"
+        
+        # Show Python path for debugging
+        echo "Python module search paths:"
+        python3 -c "import sys; print('\\n'.join(sys.path))"
         
         # Verify all system packages are accessible
         echo "Verifying all system packages are accessible..."
@@ -457,7 +464,20 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         echo "Building size-optimized Linux executable (browser-based)..."
-        python3 -m PyInstaller StreamerViewer.spec --noconfirm --clean
+        
+        # Test pymediainfo import before PyInstaller build
+        echo "Testing pymediainfo import before build..."
+        python3 -c "import pymediainfo; print('✅ pymediainfo import successful:', pymediainfo.__version__)" || echo "❌ pymediainfo import failed"
+        
+        # Build with verbose output to see what PyInstaller is doing
+        python3 -m PyInstaller StreamerViewer.spec --noconfirm --clean --log-level INFO
+        
+        # Check if pymediainfo was actually included in the build
+        echo "Checking if pymediainfo was included in the build..."
+        if [ -f "build/StreamerViewer-Linux/Analysis-00.toc" ]; then
+          echo "Searching for pymediainfo in PyInstaller analysis..."
+          grep -i "pymediainfo" build/StreamerViewer-Linux/Analysis-00.toc || echo "❌ pymediainfo not found in analysis"
+        fi
         
         # Compress with UPX for smaller size
         echo "Compressing executable with UPX..."
