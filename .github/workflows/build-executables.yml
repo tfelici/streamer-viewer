@@ -314,7 +314,6 @@ jobs:
                 'xml',
                 'xmlrpc',
                 'urllib3.packages',
-                'distutils',
                 'lib2to3',
                 'pydoc_data',
                 'test',
