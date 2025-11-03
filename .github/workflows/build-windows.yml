@@ -28,10 +28,72 @@ jobs:
         python -m pip install --upgrade pip
         pip install Flask requests requests-toolbelt Pillow pyinstaller pywebview pymediainfo
 
-    - name: Build executable with PyInstaller (using spec file for splash screen)
+    - name: Build executable with PyInstaller (command-line with splash screen)
       run: |
-        # Build using the spec file (same as local build)
-        python -m PyInstaller StreamerViewer.spec --noconfirm --clean
+        python -m PyInstaller --onefile --noconsole --name StreamerViewer `
+        --add-data "templates;templates" `
+        --add-data "static;static" `
+        --add-data "splash.png;." `
+        --splash splash.png `
+        --splash-text-pos "10,300" `
+        --splash-text-size 14 `
+        --splash-text-color white `
+        --hidden-import webview `
+        --hidden-import webview.platforms.winforms `
+        --hidden-import webview.platforms.cef `
+        --hidden-import webview.platforms.qt `
+        --hidden-import flask `
+        --hidden-import flask.json `
+        --hidden-import flask.templating `
+        --hidden-import jinja2 `
+        --hidden-import jinja2.ext `
+        --hidden-import markupsafe `
+        --hidden-import requests `
+        --hidden-import requests.adapters `
+        --hidden-import requests.auth `
+        --hidden-import requests.cookies `
+        --hidden-import requests.exceptions `
+        --hidden-import requests.models `
+        --hidden-import requests.sessions `
+        --hidden-import requests.structures `
+        --hidden-import requests.utils `
+        --hidden-import urllib3 `
+        --hidden-import urllib3.contrib `
+        --hidden-import urllib3.util `
+        --hidden-import urllib3.util.retry `
+        --hidden-import urllib3.poolmanager `
+        --hidden-import certifi `
+        --hidden-import charset_normalizer `
+        --hidden-import idna `
+        --hidden-import threading `
+        --hidden-import json `
+        --hidden-import datetime `
+        --hidden-import werkzeug `
+        --hidden-import werkzeug.utils `
+        --hidden-import werkzeug.serving `
+        --hidden-import werkzeug.security `
+        --hidden-import click `
+        --hidden-import itsdangerous `
+        --hidden-import socket `
+        --hidden-import sys `
+        --hidden-import os `
+        --hidden-import re `
+        --hidden-import time `
+        --hidden-import uuid `
+        --hidden-import ctypes `
+        --hidden-import ctypes.wintypes `
+        --hidden-import pymediainfo `
+        --exclude-module tkinter `
+        --exclude-module matplotlib `
+        --exclude-module numpy `
+        --exclude-module scipy `
+        --exclude-module pandas `
+        --exclude-module PyQt5 `
+        --exclude-module PyQt6 `
+        --exclude-module PySide2 `
+        --exclude-module PySide6 `
+        --noconfirm --clean `
+        main.py
 
     - name: Create artifacts directory
       run: |
