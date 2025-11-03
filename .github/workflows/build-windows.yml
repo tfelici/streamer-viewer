@@ -228,32 +228,25 @@ jobs:
         print('Windows executable copied to artifacts')
         
         # Create installation instructions for Windows users
-        instructions = '''# Windows Installation Instructions
-        
-        ## SmartScreen Warning (Expected)
-        When you first run StreamerViewer.exe, Windows may show a SmartScreen warning:
-        \"Windows protected your PC - Microsoft Defender SmartScreen prevented an unrecognized app from starting\"
-        
-        This is normal for unsigned executables. To run the application:
-        
-        1. Click \"More info\" on the SmartScreen dialog
-        2. Click \"Run anyway\" at the bottom
-        3. The application will start normally
-        
-        ## Why This Happens
-        - This executable is not digitally signed with a commercial code signing certificate
-        - Windows flags all unsigned executables as potentially unsafe
-        - This is a security feature, not an indication of malware
-        
-        ## Alternative: Run from Source
-        If you prefer not to use the executable:
-        1. Install Python 3.12+
-        2. pip install Flask requests requests-toolbelt Pillow pywebview pymediainfo
-        3. Run: python main.py
-        
-        ## Virus Scanning
-        The executable has been built automatically on GitHub Actions and can be scanned with any antivirus software.
-        '''
+        instructions = '# Windows Installation Instructions\n\n'
+        instructions += '## SmartScreen Warning (Expected)\n'
+        instructions += 'When you first run StreamerViewer.exe, Windows may show a SmartScreen warning:\n'
+        instructions += '\"Windows protected your PC - Microsoft Defender SmartScreen prevented an unrecognized app from starting\"\n\n'
+        instructions += 'This is normal for self-signed executables. To run the application:\n\n'
+        instructions += '1. Click \"More info\" on the SmartScreen dialog\n'
+        instructions += '2. Click \"Run anyway\" at the bottom\n'
+        instructions += '3. The application will start normally\n\n'
+        instructions += '## Why This Happens\n'
+        instructions += '- This executable is digitally signed but with a self-signed certificate\n'
+        instructions += '- Windows flags executables not signed by commercial certificate authorities\n'
+        instructions += '- This is a security feature, not an indication of malware\n\n'
+        instructions += '## Alternative: Run from Source\n'
+        instructions += 'If you prefer not to use the executable:\n'
+        instructions += '1. Install Python 3.12+\n'
+        instructions += '2. pip install Flask requests requests-toolbelt Pillow pywebview pymediainfo\n'
+        instructions += '3. Run: python main.py\n\n'
+        instructions += '## Virus Scanning\n'
+        instructions += 'The executable has been built automatically on GitHub Actions and can be scanned with any antivirus software.\n'
         
         with open('artifacts/WINDOWS_INSTALLATION.md', 'w') as f:
             f.write(instructions)
