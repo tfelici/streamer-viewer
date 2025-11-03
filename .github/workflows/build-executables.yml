@@ -101,7 +101,9 @@ jobs:
         # Install only essential packages not available as system packages:
         python3 -m pip install --user pyinstaller  # Not available as system package
         python3 -m pip install --user requests-toolbelt  # Extension, not in system
-        python3 -m pip install --user pymediainfo  # Media file information library
+        
+        # Install pymediainfo system-wide to ensure PyInstaller can find it
+        sudo python3 -m pip install pymediainfo  # Media file information library
         
         # Verify pymediainfo is available
         echo "Verifying pymediainfo installation..."
