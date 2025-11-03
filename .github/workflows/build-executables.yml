@@ -454,9 +454,9 @@ jobs:
         python -c "
         import shutil
         import os
-        os.chdir('dist')
-        shutil.make_archive('../artifacts/StreamerViewer-macos', 'zip', '.', 'StreamerViewer.app')
-        print('macOS app bundle zipped to artifacts')
+        # Copy the single executable file (not an app bundle since we use --onefile)
+        shutil.copy('dist/StreamerViewer-macOS', 'artifacts/StreamerViewer-macos')
+        print('macOS executable copied to artifacts')
         "
 
     - name: List build output (Debug)
@@ -528,18 +528,18 @@ jobs:
           ### Downloads
           - **Windows**: Download `StreamerViewer-windows.exe` 
           - **Linux**: Download `StreamerViewer-linux` (make executable with `chmod +x`)
-          - **macOS**: Download `StreamerViewer-macos.zip` (extract and run the .app)
+          - **macOS**: Download `StreamerViewer-macos` (make executable with `chmod +x`)
           
           ### Installation
           1. Download the appropriate file for your operating system
           2. For Linux: `chmod +x StreamerViewer-linux && ./StreamerViewer-linux`
           3. For Windows: Double-click `StreamerViewer-windows.exe`
-          4. For macOS: Extract zip and double-click `StreamerViewer.app`
+          4. For macOS: `chmod +x StreamerViewer-macos && ./StreamerViewer-macos`
           
           ### System Requirements
           - **Windows**: Windows 10 or later
-          - **Linux**: Ubuntu 18.04+ or equivalent (Qt5 libraries bundled)
-          - **macOS**: macOS 10.15+ (Catalina or later)
+          - **Linux**: Ubuntu 18.04+ or equivalent (browser-based, no GUI libraries needed)
+          - **macOS**: macOS 10.15+ (Catalina or later, browser-based)
           
           Built automatically with GitHub Actions.
         files: release-artifacts/*/*
@@ -604,21 +604,13 @@ jobs:
           echo "⚠️  Linux executable not found in artifacts"
         fi
 
-        # Copy macOS executable (extract from zip)
-        if [ -f "build-artifacts/StreamerViewer-macos/StreamerViewer-macos.zip" ]; then
-          cd build-artifacts/StreamerViewer-macos/
-          unzip -q StreamerViewer-macos.zip
-          if [ -f "StreamerViewer.app/Contents/MacOS/StreamerViewer" ]; then
-            cp "StreamerViewer.app/Contents/MacOS/StreamerViewer" "../../macos/dist/StreamerViewer"
-            chmod +x "../../macos/dist/StreamerViewer"
-            cd ../..
-            echo "✅ macOS executable ready for installer download"
-          else
-            cd ../..
-            echo "⚠️  macOS executable not found in app bundle"
-          fi
+        # Copy macOS executable (single file, not app bundle)
+        if [ -f "build-artifacts/StreamerViewer-macos/StreamerViewer-macos" ]; then
+          cp "build-artifacts/StreamerViewer-macos/StreamerViewer-macos" "macos/dist/StreamerViewer"
+          chmod +x "macos/dist/StreamerViewer"
+          echo "✅ macOS executable ready for installer download"
         else
-          echo "⚠️  macOS executable zip not found in artifacts"
+          echo "⚠️  macOS executable not found in artifacts"
         fi
 
     - name: Check for executable availability
