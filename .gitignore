@@ -71,15 +71,3 @@ streamerData/
 
 # Generated splash preview (keep static splash.png)
 splash_preview.gif
-
-# Executable files (but allow the main standalone executable)
-# *.exe - commented out to allow StreamerViewer_Standalone.exe
-# StreamerViewer_Standalone.exe - commented out to allow in repository
-
-# Executable directories (now using GitHub Releases)
-windows/
-linux/
-macos/
-executables/
-dist/
-*.exe
