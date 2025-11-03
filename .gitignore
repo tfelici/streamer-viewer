@@ -30,7 +30,6 @@ MANIFEST
 windows/
 linux/
 macos/
-*.spec
 build_*.sh
 build_*.bat
 cleanup_*.sh
