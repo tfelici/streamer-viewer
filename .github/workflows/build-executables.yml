@@ -76,7 +76,9 @@ jobs:
           python3-pil \
           python3-setuptools \
           python3-pkg-resources \
-          python3-pip
+          python3-pip \
+          libmediainfo0v5 \
+          libmediainfo-dev
         
         echo "Current Python: $(python --version)"
         echo "Python path: $(which python)"
@@ -99,7 +101,11 @@ jobs:
         # Install only essential packages not available as system packages:
         python3 -m pip install --user pyinstaller  # Not available as system package
         python3 -m pip install --user requests-toolbelt  # Extension, not in system
-        python3 -m pip install --user pymediainfo  # Not in system
+        python3 -m pip install --user pymediainfo  # Media file information library
+        
+        # Verify pymediainfo is available
+        echo "Verifying pymediainfo installation..."
+        python3 -c "import pymediainfo; print('✓ pymediainfo available')" || echo "✗ pymediainfo installation failed"
         
         # Verify system packages are accessible
         echo "Verifying system packages are accessible..."
