@@ -19,27 +19,30 @@ from werkzeug.utils import secure_filename
 import requests
 from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 
-# Platform-specific imports
-if os.name == 'nt':  # Windows only
+# Try to import webview early (available on all platforms)
+try:
     import webview
+except ImportError:
+    webview = None
+# If webview import fails, it will be imported dynamically when needed
 
 # Pure Python MP4 parsing
 import struct
 
-# Splash screen support - Windows only (PyInstaller)
+# Splash screen support (PyInstaller - available on all platforms)
 SPLASH_AVAILABLE = False
 
 try:
     import pyi_splash
     SPLASH_AVAILABLE = True
 except ImportError:
-    # Linux/macOS: No splash screen, just use browser
+    # No splash screen when running as script or PyInstaller not used
     pass
 
 def update_splash_text(text):
-    """Update splash screen text - Windows only (PyInstaller)"""
+    """Update splash screen text (PyInstaller - available on all platforms)"""
     if not SPLASH_AVAILABLE:
-        print(f"[Streamer Viewer] {text}")  # Linux/macOS: Just print to console
+        print(f"[Streamer Viewer] {text}")  # Print to console when no splash screen
         return
         
     try:
@@ -48,7 +51,7 @@ def update_splash_text(text):
         print(f"Splash screen update error: {e}")
 
 def close_splash():
-    """Close splash screen - Windows only (PyInstaller)"""
+    """Close splash screen (PyInstaller - available on all platforms)"""
     if not SPLASH_AVAILABLE:
         return
         
@@ -61,7 +64,8 @@ def open_browser(url):
     """Open URL in default browser (Linux/macOS fallback)"""
     import webbrowser
     try:
-        webbrowser.open(url)
+        # Use Python's webbrowser module - it should handle default browser correctly
+        webbrowser.open(url, new=2)  # new=2 opens in new tab if possible
         return True
     except Exception as e:
         print(f"Failed to open browser: {e}")
@@ -841,6 +845,25 @@ def is_port_available(port):
     except OSError:
         return False
 
+def find_existing_instance(start_port=5001, max_port=5100):
+    """Check if Streamer Viewer is already running on any port in range"""
+    import urllib.request
+    import urllib.error
+    
+    for port in range(start_port, max_port):
+        if not is_port_available(port):
+            # Port is in use, check if it's our app
+            try:
+                url = f"http://127.0.0.1:{port}/"
+                response = urllib.request.urlopen(url, timeout=2)
+                content = response.read().decode('utf-8')
+                # Check if this looks like our Streamer Viewer app
+                if 'Streamer Viewer' in content or 'GPS Track and Video Viewer' in content:
+                    return port
+            except (urllib.error.URLError, ConnectionRefusedError, socket.timeout):
+                continue
+    return None
+
 def find_available_port(start_port=5001, max_port=5100):
     """Find an available port"""
     for port in range(start_port, max_port):
@@ -856,11 +879,70 @@ def main():
     """Main function to start the application"""
     print("Starting Streamer Viewer...")
     
-    # Update splash screen if available (Windows only)
+    # Check webview availability once at startup
+    webview_available = False
+    webview_module = None
+    try:
+        if webview is not None:
+            webview_module = webview
+            webview_available = True
+        else:
+            # Try dynamic import
+            import webview as webview_module
+            webview_available = True
+    except (ImportError, NameError):
+        webview_available = False
+        print("Webview not available, will use browser fallback")
+    
+    # Update splash screen if available (PyInstaller builds)
     update_splash_text("🚀 Starting Streamer Viewer...")
     if SPLASH_AVAILABLE:
         time.sleep(1.0)  # Only delay if splash screen is visible
     
+    # Check if another instance is already running
+    update_splash_text("🔍 Checking for existing instance...")
+    if SPLASH_AVAILABLE:
+        time.sleep(0.3)
+    
+    existing_port = find_existing_instance()
+    if existing_port:
+        print(f"Found existing Streamer Viewer instance on port {existing_port}")
+        update_splash_text("✅ Opening existing instance...")
+        if SPLASH_AVAILABLE:
+            time.sleep(0.3)
+        close_splash()
+        
+        # Open the existing instance
+        existing_url = f"http://127.0.0.1:{existing_port}"
+        
+        # Use webview if available, otherwise fallback to browser
+        if webview_available:
+            try:
+                webview_module.create_window(
+                    "Streamer Viewer", 
+                    existing_url,
+                    width=1200,
+                    height=800,
+                    resizable=True
+                )
+                webview_module.start(debug=False)
+            except Exception as e:
+                print(f"Webview failed to start ({e}), using browser fallback...")
+                # Fallback to browser
+                if open_browser(existing_url):
+                    print("✅ Opened existing instance in browser")
+                else:
+                    print(f"⚠️  Please open {existing_url} manually")
+        else:
+            # Use browser fallback
+            if open_browser(existing_url):
+                print("✅ Opened existing instance in browser")
+            else:
+                print(f"⚠️  Please open {existing_url} manually")
+        
+        return  # Exit without starting new server
+    
+    print("No existing instance found, starting new server...")
     print(f"Using streamer data directory: {STREAMER_DATA_DIR}")
     
     # Update splash screen if available
@@ -914,25 +996,50 @@ def main():
     # Platform-specific UI approach
     window_url = f"http://127.0.0.1:{port}"
     
-    if os.name == 'nt':  # Windows - use webview with splash
-        update_splash_text("✅ Ready! Opening window...")
-        if SPLASH_AVAILABLE:
-            time.sleep(0.3)
-        close_splash()
-        
-        print(f"Opening webview window: {window_url}")
-        
-        # Import webview here to ensure it's available (already imported at top for Windows)
-        webview.create_window(
-            "Streamer Viewer", 
-            window_url,
-            width=1200,
-            height=800,
-            resizable=True
-        )
-        webview.start(debug=False)
-        
-    else:  # Linux/macOS - use browser
+    # Try webview first (available on all platforms), fallback to browser
+    update_splash_text("✅ Ready! Opening application...")
+    if SPLASH_AVAILABLE:
+        time.sleep(0.3)
+    close_splash()
+    
+    # Use webview if available, otherwise fallback to browser
+    if webview_available and webview_module is not None:
+        try:
+            print(f"Opening webview window: {window_url}")
+            webview_module.create_window(
+                "Streamer Viewer", 
+                window_url,
+                width=1200,
+                height=800,
+                resizable=True
+            )
+            webview_module.start(debug=False)
+        except Exception as e:
+            print(f"Webview failed to start ({e}), using browser fallback...")
+            # Fallback to browser and keep server running
+            print(f"Opening in browser: {window_url}")
+            print("=" * 60)
+            print("🚀 Streamer Viewer is now running!")
+            print(f"📍 Web interface: {window_url}")
+            print("🌐 Opening in your default browser...")
+            print("❌ Close this terminal window to stop the server")
+            print("=" * 60)
+            
+            if open_browser(window_url):
+                print("✅ Browser opened successfully")
+            else:
+                print("⚠️  Could not open browser automatically")
+                print(f"   Please open {window_url} manually")
+            
+            # Keep server running
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print("\n👋 Shutting down Streamer Viewer...")
+                return
+    else:
+        # Use browser fallback
         print(f"Opening in browser: {window_url}")
         print("=" * 60)
         print("🚀 Streamer Viewer is now running!")
@@ -948,7 +1055,7 @@ def main():
             print("⚠️  Could not open browser automatically")
             print(f"   Please open {window_url} manually")
         
-        # Keep server running
+        # Keep server running (only needed when using browser fallback)
         try:
             while True:
                 time.sleep(1)
