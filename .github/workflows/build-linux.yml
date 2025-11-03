@@ -60,6 +60,10 @@ jobs:
         # Also install in user directory as fallback for PyInstaller
         python3 -m pip install --user pymediainfo
         
+        # Try to copy the mediainfo library files that pymediainfo needs
+        echo "Locating libmediainfo shared libraries..."
+        find /usr/lib* -name "*mediainfo*" -type f 2>/dev/null || echo "No mediainfo libraries found"
+        
         echo "Current Python: $(python --version)"
         echo "Python path: $(which python)"
         
@@ -74,6 +78,33 @@ jobs:
         # Install only essential packages not available as system packages:
         python3 -m pip install --user pyinstaller  # Not available as system package
         python3 -m pip install --user requests-toolbelt  # Extension, not in system
+        
+        # Create a runtime hook for pymediainfo
+        mkdir -p hooks
+        cat > hooks/hook-pymediainfo.py << 'EOF'
+        # PyInstaller hook for pymediainfo
+        from PyInstaller.utils.hooks import collect_all
+        
+        datas, binaries, hiddenimports = collect_all('pymediainfo')
+        
+        # Add additional paths where mediainfo library might be found
+        import os
+        mediainfo_paths = [
+            '/usr/lib/x86_64-linux-gnu',
+            '/usr/lib',
+            '/lib/x86_64-linux-gnu',
+            '/lib'
+        ]
+        
+        for path in mediainfo_paths:
+            for lib in ['libmediainfo.so.0', 'libmediainfo.so']:
+                lib_path = os.path.join(path, lib)
+                if os.path.exists(lib_path):
+                    binaries.append((lib_path, '.'))
+                    print(f"Added mediainfo library: {lib_path}")
+        EOF
+        
+        echo "Created PyInstaller hook for pymediainfo"
         
         # Verify pymediainfo is available (should be installed both system-wide and user)
         echo "Verifying pymediainfo installation..."
@@ -120,12 +151,46 @@ jobs:
         which python3
         python3 -c "import sys; print('Python path:', sys.executable)"
 
+    - name: Find mediainfo libraries for PyInstaller
+      run: |
+        echo "Finding mediainfo libraries for inclusion in PyInstaller..."
+        
+        # Find the actual libmediainfo library path
+        MEDIAINFO_LIB=$(find /usr/lib* -name "libmediainfo.so.0" -type f 2>/dev/null | head -n1)
+        if [ -n "$MEDIAINFO_LIB" ]; then
+          echo "Found mediainfo library: $MEDIAINFO_LIB"
+          echo "MEDIAINFO_LIB_PATH=$MEDIAINFO_LIB" >> $GITHUB_ENV
+        else
+          echo "❌ libmediainfo.so.0 not found, pymediainfo may not work in executable"
+        fi
+        
+        # Also check for the development version
+        MEDIAINFO_DEV_LIB=$(find /usr/lib* -name "libmediainfo.so" -type f 2>/dev/null | head -n1)
+        if [ -n "$MEDIAINFO_DEV_LIB" ]; then
+          echo "Found mediainfo dev library: $MEDIAINFO_DEV_LIB"
+          echo "MEDIAINFO_DEV_LIB_PATH=$MEDIAINFO_DEV_LIB" >> $GITHUB_ENV
+        fi
+
     - name: Create PyInstaller spec file for browser-based app
       run: |
         echo "Creating PyInstaller spec for browser-based Flask app..."
+        
+        # Prepare binary includes for mediainfo
+        BINARY_INCLUDES="[]"
+        if [ -n "$MEDIAINFO_LIB_PATH" ]; then
+          echo "Including mediainfo library: $MEDIAINFO_LIB_PATH"
+          BINARY_INCLUDES="[('$MEDIAINFO_LIB_PATH', '.')]"
+        fi
+        export BINARY_INCLUDES
+        
         python -c "
         import os
-        spec_content = '''# -*- mode: python ; coding: utf-8 -*-
+        
+        # Get binary includes from environment
+        binary_includes = os.environ.get('BINARY_INCLUDES', '[]')
+        print(f'Using binary includes: {binary_includes}')
+        
+        spec_content = f'''# -*- mode: python ; coding: utf-8 -*-
         # Browser-based Flask app - minimal dependencies (no Qt required)
         
         block_cipher = None
@@ -133,7 +198,7 @@ jobs:
         a = Analysis(
             ['main.py'],
             pathex=['.'],
-            binaries=[],
+            binaries={binary_includes},
             datas=[
                 ('templates', 'templates'),
                 ('static', 'static'),
@@ -185,7 +250,7 @@ jobs:
                 'functools',  # Functional tools
                 'itertools',  # Iterator tools
             ],
-            hookspath=[],
+            hookspath=['hooks'],
             hooksconfig={},
             runtime_hooks=[],
             excludes=[
@@ -201,6 +266,8 @@ jobs:
                 'wx',
                 'kivy',
                 'pygame',
+                # Exclude splash screen - Linux uses browser-based approach
+                'pyi_splash',
                 # Exclude ALL scientific/data packages 
                 'matplotlib', 
                 'numpy', 
