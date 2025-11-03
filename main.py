@@ -849,6 +849,7 @@ def find_existing_instance(start_port=5001, max_port=5100):
     """Check if Streamer Viewer is already running on any port in range"""
     import urllib.request
     import urllib.error
+    import http.client
     
     for port in range(start_port, max_port):
         if not is_port_available(port):
@@ -860,7 +861,9 @@ def find_existing_instance(start_port=5001, max_port=5100):
                 # Check if this looks like our Streamer Viewer app
                 if 'Streamer Viewer' in content or 'GPS Track and Video Viewer' in content:
                     return port
-            except (urllib.error.URLError, ConnectionRefusedError, socket.timeout):
+            except (urllib.error.URLError, ConnectionRefusedError, socket.timeout, 
+                    http.client.RemoteDisconnected, http.client.HTTPException, OSError):
+                # Skip this port if connection fails for any reason
                 continue
     return None
 
@@ -916,7 +919,7 @@ def main():
         existing_url = f"http://127.0.0.1:{existing_port}"
         
         # Use webview if available, otherwise fallback to browser
-        if webview_available:
+        if webview_available and webview_module is not None:
             try:
                 webview_module.create_window(
                     "Streamer Viewer", 
