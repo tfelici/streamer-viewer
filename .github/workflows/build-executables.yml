@@ -310,7 +310,6 @@ jobs:
                 'pytest',
                 'sqlite3',
                 'unicodedata',
-                'email',
                 'xml',
                 'xmlrpc',
                 'urllib3.packages',
