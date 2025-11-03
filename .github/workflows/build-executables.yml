@@ -374,12 +374,12 @@ jobs:
     - name: Build executable with PyInstaller (Linux optimized size)
       if: matrix.platform == 'linux'
       run: |
-        echo "Building size-optimized Linux executable with Qt bundling..."
-        python3 -m PyInstaller StreamerViewer.spec --noconfirm --clean --strip
+        echo "Building size-optimized Linux executable (browser-based)..."
+        python3 -m PyInstaller StreamerViewer.spec --noconfirm --clean
         
         # Compress with UPX for smaller size
         echo "Compressing executable with UPX..."
-        upx --best --lzma dist/StreamerViewer || echo "UPX compression failed, continuing..."
+        upx --best --lzma dist/StreamerViewer-Linux || echo "UPX compression failed, continuing..."
 
     - name: Build executable with PyInstaller (macOS browser-based)
       if: matrix.platform == 'macos'
@@ -428,7 +428,7 @@ jobs:
       run: |
         python -c "
         import shutil
-        shutil.copy('dist/StreamerViewer', 'artifacts/StreamerViewer-linux')
+        shutil.copy('dist/StreamerViewer-Linux', 'artifacts/StreamerViewer-linux')
         print('Linux executable copied to artifacts')
         
         # Create desktop entry for proper GNOME integration  
