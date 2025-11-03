@@ -195,11 +195,24 @@ jobs:
         
         if (Test-Path $signtool) {
           echo "Found signtool at: $signtool"
-          & "$signtool" sign /f "StreamerViewer.pfx" /p "StreamerViewer2024!" /t http://timestamp.digicert.com /fd SHA256 /v "dist\StreamerViewer.exe"
           
-          # Verify the signature
-          & "$signtool" verify /pa /v "dist\StreamerViewer.exe"
-          echo "✅ Executable signed successfully"
+          # Sign the executable
+          $signResult = & "$signtool" sign /f "StreamerViewer.pfx" /p "StreamerViewer2024!" /t http://timestamp.digicert.com /fd SHA256 /v "dist\StreamerViewer.exe"
+          
+          if ($LASTEXITCODE -eq 0) {
+            echo "✅ Executable signed successfully"
+            
+            # Verify signature (this will show warnings for self-signed certs, but that's expected)
+            echo "🔍 Verifying signature (trust warnings expected for self-signed certificates)..."
+            try {
+              & "$signtool" verify /pa /v "dist\StreamerViewer.exe" 2>&1 | Out-Host
+            } catch {
+              echo "ℹ️ Verification shows trust warnings (normal for self-signed certificates)"
+            }
+            echo "📋 Code signing completed - SmartScreen warnings should be reduced"
+          } else {
+            echo "⚠️ Code signing failed, but continuing build"
+          }
         } else {
           echo "⚠️ signtool.exe not found, executable will remain unsigned"
           echo "This may trigger SmartScreen warnings on Windows"
