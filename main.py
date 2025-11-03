@@ -913,7 +913,6 @@ def main():
         update_splash_text("✅ Opening existing instance...")
         if SPLASH_AVAILABLE:
             time.sleep(0.3)
-        close_splash()
         
         # Open the existing instance
         existing_url = f"http://127.0.0.1:{existing_port}"
@@ -928,6 +927,8 @@ def main():
                     height=800,
                     resizable=True
                 )
+                # Close splash screen just before webview starts
+                close_splash()
                 webview_module.start(debug=False)
             except Exception as e:
                 print(f"Webview failed to start ({e}), using browser fallback...")
@@ -936,12 +937,18 @@ def main():
                     print("✅ Opened existing instance in browser")
                 else:
                     print(f"⚠️  Please open {existing_url} manually")
+                
+                # Close splash screen after browser attempt (successful or not)
+                close_splash()
         else:
             # Use browser fallback
             if open_browser(existing_url):
                 print("✅ Opened existing instance in browser")
             else:
                 print(f"⚠️  Please open {existing_url} manually")
+            
+            # Close splash screen after browser attempt (successful or not)
+            close_splash()
         
         return  # Exit without starting new server
     
@@ -1003,7 +1010,6 @@ def main():
     update_splash_text("✅ Ready! Opening application...")
     if SPLASH_AVAILABLE:
         time.sleep(0.3)
-    close_splash()
     
     # Use webview if available, otherwise fallback to browser
     if webview_available and webview_module is not None:
@@ -1016,6 +1022,8 @@ def main():
                 height=800,
                 resizable=True
             )
+            # Close splash screen just before webview starts
+            close_splash()
             webview_module.start(debug=False)
         except Exception as e:
             print(f"Webview failed to start ({e}), using browser fallback...")
@@ -1033,6 +1041,9 @@ def main():
             else:
                 print("⚠️  Could not open browser automatically")
                 print(f"   Please open {window_url} manually")
+            
+            # Close splash screen after browser attempt (successful or not)
+            close_splash()
             
             # Keep server running
             try:
@@ -1057,6 +1068,9 @@ def main():
         else:
             print("⚠️  Could not open browser automatically")
             print(f"   Please open {window_url} manually")
+        
+        # Close splash screen after browser attempt (successful or not)
+        close_splash()
         
         # Keep server running (only needed when using browser fallback)
         try:
