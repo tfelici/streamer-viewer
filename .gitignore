@@ -26,14 +26,6 @@ MANIFEST
 *.manifest
 *.spec.bak
 
-# Local build directories and files (CI/CD handles building)
-windows/
-linux/
-macos/
-build_*.sh
-build_*.bat
-cleanup_*.sh
-
 # Virtual environments
 .env
 .venv
