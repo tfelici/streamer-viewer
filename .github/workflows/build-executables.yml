@@ -116,10 +116,10 @@ jobs:
         # Install jaraco dependencies explicitly to fix pkg_resources issues
         pip install jaraco.text jaraco.functools jaraco.collections importlib-metadata
 
-    - name: Install GUI frameworks (macOS only - Windows uses webview native)
+    - name: No additional GUI frameworks needed (macOS uses browser-based approach)
       if: matrix.platform == 'macos'
       run: |
-        pip install PyQt5 PyQt5-Qt5 PyQt5-sip
+        echo "macOS will use browser-based approach - no additional GUI frameworks needed"
 
     - name: Create PyInstaller spec file (Windows with splash)
       if: matrix.platform == 'windows'
@@ -224,28 +224,30 @@ jobs:
         print('Windows spec file created successfully')
         "
 
-    - name: Use system Python QT packages (Ubuntu 24.04 default)
+    - name: Verify system Python packages for browser-based app
       if: matrix.platform == 'linux'
       run: |
-        echo "Using system Python and QT packages for maximum compatibility..."
+        echo "Using system Python packages for browser-based Flask app..."
         
         # Show system Python version and location
         echo "System Python version: $(python3 --version)"
         echo "System Python location: $(which python3)"
-        echo "Available system Python packages:"
-        ls /usr/lib/python3*/dist-packages/ | grep -E "(PyQt5|qt)" || echo "No QT packages found in system dist-packages"
+        echo "Available system Flask packages:"
+        ls /usr/lib/python3*/dist-packages/ | grep -E "(flask|requests)" || echo "Flask packages not found"
         
-        # Check if system QT Python bindings are available
+        # Check if system Flask is available (no Qt needed for browser approach)
         python3 -c "
         try:
-            from PyQt5 import QtCore, QtWidgets, QtWebEngineWidgets
-            print('✓ PyQt5 available via system packages')
-            print(f'✓ QT version: {QtCore.QT_VERSION_STR}')
-            print('✓ QtWebEngineWidgets available via system packages')
-            print('PyQt5 module location:', QtCore.__file__)
+            import flask
+            import requests
+            from PIL import Image
+            print('✓ Flask available via system packages')
+            print('✓ Requests available via system packages') 
+            print('✓ PIL available via system packages')
+            print('✓ Browser-based approach ready')
         except ImportError as e:
-            print('✗ System PyQt5 not available:', e)
-            exit(1)
+            print('System packages check:', e)
+            print('Will use pip-installed packages instead')
         "
         
         # Ensure we're using system python3 for PyInstaller
@@ -253,29 +255,10 @@ jobs:
         which python3
         python3 -c "import sys; print('Python path:', sys.executable)"
         
-    - name: Create PyInstaller spec file (Linux with targeted QT bundling)
+    - name: Create PyInstaller spec file (Linux browser-based)
       if: matrix.platform == 'linux'
       run: |
-        # Create runtime hook for system QT packages
-        mkdir -p hooks
-        cat > hooks/hook-qt.py << 'EOF'
-        # Runtime hook for system QT packages
-        import os
-        import sys
-
-        # Add system library paths for QT packages - detect Python version dynamically
-        import sys
-        python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
-        qt_paths = [
-            '/usr/lib/python3/dist-packages',  # System QT packages
-            f'/home/runner/.local/lib/{python_version}/site-packages',  # User packages for detected version
-        ]
-        
-        for path in qt_paths:
-            if path not in sys.path and os.path.exists(path):
-                sys.path.insert(0, path)
-                
-        # Set QT plugin path for system packages
+        echo "Creating PyInstaller spec for browser-based Flask app..."
         qt_plugin_path = os.environ.get('QT_PLUGIN_PATH', '')
         system_qt_paths = [
             '/usr/lib/x86_64-linux-gnu/qt5/plugins',
@@ -292,77 +275,47 @@ jobs:
                     
         if qt_plugin_path:
             os.environ['QT_PLUGIN_PATH'] = qt_plugin_path
-        EOF
         
         python -c "
         import os
         spec_content = '''# -*- mode: python ; coding: utf-8 -*-
-        # Targeted QT bundling for pywebview support while minimizing size
-        from PyInstaller.utils.hooks import collect_submodules, collect_data_files
-        
-        # Collect only essential QT modules needed by pywebview
-        qt_submodules = [
-            'PyQt5.QtCore',
-            'PyQt5.QtWidgets', 
-            'PyQt5.QtWebEngineWidgets',
-            'PyQt5.QtWebChannel',
-            'PyQt5.QtGui',
-        ]
-        
-        # Collect only essential QT data files with strict filtering
-        try:
-            qt_datas = collect_data_files('PyQt5', includes=['*.so'])
-            # Filter to only include absolutely essential Qt libraries
-            essential_qt_files = []
-            for name, path in qt_datas:
-                if any(essential in path.lower() for essential in [
-                    'qtcore', 'qtgui', 'qtwidgets', 'qtwebengine', 'qtwebchannel'
-                ]):
-                    essential_qt_files.append((name, path))
-            qt_datas = essential_qt_files
-        except:
-            qt_datas = []
+        # Browser-based Flask app - minimal dependencies (no Qt required)
         
         block_cipher = None
         
-        # Detect Python version dynamically
-        import sys
-        python_version = f'python{sys.version_info.major}.{sys.version_info.minor}'
-        
         a = Analysis(
             ['main.py'],
-            pathex=[
-                '.', 
-                '/usr/lib/python3/dist-packages',  # System QT packages location
-                f'/home/runner/.local/lib/{python_version}/site-packages',  # User-installed packages for detected version
-            ],
+            pathex=['.'],
             binaries=[],
             datas=[
                 ('templates', 'templates'),
                 ('static', 'static'),
-                ('splash.png', '.'),
-            ] + qt_datas,
+            ],
             hiddenimports=[
-                'webview',
-                'webview.platforms.qt',
                 'pymediainfo',
                 'flask',
                 'requests',
-                # Minimal QT - let system provide the rest
-                'PyQt5.QtCore',
-                'PyQt5.QtWidgets',
-                'PyQt5.QtWebEngineWidgets',
-                # Fix setuptools/pkg_resources dependencies
-                'jaraco.text',
-                'jaraco.functools', 
-                'jaraco.collections',
-                'importlib_metadata',
+                'requests_toolbelt',
+                'webbrowser',  # For browser launching
+                # Fix setuptools/pkg_resources dependencies if needed
+                'pkg_resources',
             ],
-            hookspath=['hooks'],
+            hookspath=[],
             hooksconfig={},
-            runtime_hooks=['hooks/hook-qt.py'],
+            runtime_hooks=[],
             excludes=[
+                # Exclude GUI frameworks - we use browser instead
                 'tkinter', 
+                'webview',
+                'PyQt5',
+                'PyQt6', 
+                'PySide2',
+                'PySide6',
+                'gi',
+                'gtk',
+                'wx',
+                'kivy',
+                # Exclude unused packages for size reduction
                 'matplotlib', 
                 'numpy', 
                 'scipy', 
@@ -372,40 +325,6 @@ jobs:
                 'notebook',
                 'sphinx',
                 'pytest',
-                'wx',
-                'kivy',
-                'PySide2',
-                'PySide6',
-                'gi',  # Exclude GTK to focus on QT
-                'gtk',
-                # Exclude large Qt modules we don't need
-                'PyQt5.Qt',
-                'PyQt5.QtSql',
-                'PyQt5.QtTest',
-                'PyQt5.QtXml',
-                'PyQt5.QtSvg',
-                'PyQt5.QtMultimedia',
-                'PyQt5.QtMultimediaWidgets', 
-                'PyQt5.QtOpenGL',
-                'PyQt5.QtPositioning',
-                'PyQt5.QtPrintSupport',
-                'PyQt5.QtQml',
-                'PyQt5.QtQuick',
-                'PyQt5.QtQuickWidgets',
-                'PyQt5.QtSensors',
-                'PyQt5.QtSerialPort',
-                'PyQt5.QtWebKit',
-                'PyQt5.QtWebKitWidgets',
-                'PyQt5.QtWinExtras',
-                'PyQt5.QtX11Extras',
-                'PyQt5.QtBluetooth',
-                'PyQt5.QtDesigner',
-                'PyQt5.QtHelp',
-                'PyQt5.QtLocation',
-                'PyQt5.QtMacExtras',
-                'PyQt5.QtNfc',
-                'PyQt5.QtWebChannel',
-                # Additional size reductions
                 'sqlite3',
                 'unicodedata',
                 'email',
@@ -438,15 +357,12 @@ jobs:
             a.zipfiles,
             a.datas,
             [],
-            name='StreamerViewer',
+            name='StreamerViewer-Linux',
             debug=False,
             bootloader_ignore_signals=False,
             strip=True,
             upx=True,
-            upx_exclude=[
-                'libQt5WebEngine*',  # Don't compress Qt WebEngine (can cause issues)
-                'libQt5WebEngineCore*',
-            ],
+            upx_exclude=[],  # No Qt libraries to exclude
             runtime_tmpdir=None,
             console=False,
             disable_windowed_traceback=False,
@@ -458,7 +374,7 @@ jobs:
         '''
         with open('StreamerViewer.spec', 'w') as f:
             f.write(spec_content)
-        print('Linux spec file created successfully with QT bundling')
+        print('Linux spec file created successfully for browser-based app')
         "
 
     - name: Build executable with PyInstaller (Windows with splash)
@@ -482,17 +398,18 @@ jobs:
         echo "Compressing executable with UPX..."
         upx --best --lzma dist/StreamerViewer || echo "UPX compression failed, continuing..."
 
-    - name: Build executable with PyInstaller (macOS optimized)
+    - name: Build executable with PyInstaller (macOS browser-based)
       if: matrix.platform == 'macos'
       run: |
-        pyinstaller --onefile --windowed --name StreamerViewer \
+        pyinstaller --onefile --windowed --name StreamerViewer-macOS \
           --add-data "templates:templates" \
           --add-data "static:static" \
           --hidden-import=pymediainfo \
-          --hidden-import=webview \
-          --hidden-import=webview.platforms.cocoa \
+          --hidden-import=webbrowser \
           --hidden-import=flask \
           --hidden-import=requests \
+          --hidden-import=requests_toolbelt \
+          --exclude-module=webview \
           --exclude-module=tkinter \
           --exclude-module=matplotlib \
           --exclude-module=numpy \
@@ -501,6 +418,9 @@ jobs:
           --exclude-module=IPython \
           --exclude-module=jupyter \
           --exclude-module=PyQt5 \
+          --exclude-module=PyQt6 \
+          --exclude-module=PySide2 \
+          --exclude-module=PySide6 \
           --exclude-module=qtpy \
           --exclude-module=gi \
           main.py
