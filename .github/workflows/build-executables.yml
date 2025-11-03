@@ -84,20 +84,23 @@ jobs:
           ### Quick Download Links
           - **[Windows](https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-windows.exe)** - Double-click to run
           - **[Linux](https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-linux)** - `chmod +x StreamerViewer-linux && ./StreamerViewer-linux`
-          - **[macOS](https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-macos)** - `chmod +x StreamerViewer-macos && ./StreamerViewer-macos`
+          - **[macOS Intel](https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-macos-x86_64)** - `chmod +x StreamerViewer-macos-x86_64 && ./StreamerViewer-macos-x86_64`
+          - **[macOS Apple Silicon](https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-macos-arm64)** - `chmod +x StreamerViewer-macos-arm64 && ./StreamerViewer-macos-arm64`
           
           ### For Automated Scripts
           ```bash
           # Download from this specific release
           wget https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-linux
           wget https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-windows.exe  
-          wget https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-macos
+          wget https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-macos-x86_64
+          wget https://github.com/tfelici/streamer-viewer/releases/download/${{ steps.get_version.outputs.VERSION }}/StreamerViewer-macos-arm64
           ```
           
           ### System Requirements
           - **Windows**: Windows 10 or later
           - **Linux**: Ubuntu 18.04+ or equivalent (browser-based, no additional GUI libraries needed)
-          - **macOS**: macOS 10.15+ (Catalina or later, browser-based)
+          - **macOS Intel**: macOS 10.15+ (Catalina or later) on Intel-based Macs or VMs
+          - **macOS Apple Silicon**: macOS 11+ (Big Sur or later) on M1/M2/M3 Macs
           
           **Built from**: ${{ steps.get_version.outputs.BRANCH == 'develop' && format('develop branch commit {0}', github.sha) || steps.get_version.outputs.BRANCH == 'main' && format('main branch commit {0}', github.sha) || 'tagged release' }}
           **Build date**: ${{ github.event.head_commit.timestamp }}
