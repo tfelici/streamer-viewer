@@ -29,6 +29,9 @@ jobs:
     # Create releases for version tags OR main/develop branch pushes
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     
+    permissions:
+      contents: write
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -60,15 +63,7 @@ jobs:
           echo "BRANCH=main" >> $GITHUB_OUTPUT
         fi
 
-    - name: Delete existing branch release if it exists
-      if: steps.get_version.outputs.IS_TAG == 'false'
-      run: |
-        # Delete existing release tag and release (will be recreated)
-        gh release delete ${{ steps.get_version.outputs.VERSION }} --yes || echo "Release ${{ steps.get_version.outputs.VERSION }} does not exist"
-        git tag -d ${{ steps.get_version.outputs.VERSION }} || echo "Tag ${{ steps.get_version.outputs.VERSION }} does not exist locally"
-        git push --delete origin ${{ steps.get_version.outputs.VERSION }} || echo "Tag ${{ steps.get_version.outputs.VERSION }} does not exist on remote"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
     - name: Create/Update Release
       uses: softprops/action-gh-release@v1
@@ -107,5 +102,7 @@ jobs:
         files: release-artifacts/*/*
         draft: false
         prerelease: ${{ steps.get_version.outputs.IS_TAG == 'false' }}
+        fail_on_unmatched_files: true
+        generate_release_notes: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
