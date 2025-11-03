@@ -4,7 +4,6 @@ Streamer Viewer - Standalone GPS Track and Video Viewer
 Displays GPS tracks as lines on a map with synchronized video playback
 """
 
-import webview
 import threading
 import time
 import sys
@@ -20,26 +19,27 @@ from werkzeug.utils import secure_filename
 import requests
 from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 
+# Platform-specific imports
+if os.name == 'nt':  # Windows only
+    import webview
+
 # Pure Python MP4 parsing
 import struct
 
-# Splash screen support - Platform-specific
+# Splash screen support - Windows only (PyInstaller)
 SPLASH_AVAILABLE = False
-SPLASH_TYPE = None
 
 try:
-    # Try PyInstaller splash first (Windows)
     import pyi_splash
     SPLASH_AVAILABLE = True
-    SPLASH_TYPE = 'pyi'
 except ImportError:
     # Linux/macOS: No splash screen, just use browser
     pass
 
 def update_splash_text(text):
     """Update splash screen text - Windows only (PyInstaller)"""
-    if not SPLASH_AVAILABLE or SPLASH_TYPE != 'pyi':
-        print(f"[Streamer Viewer] {text}")  # Linux: Just print to console
+    if not SPLASH_AVAILABLE:
+        print(f"[Streamer Viewer] {text}")  # Linux/macOS: Just print to console
         return
         
     try:
@@ -49,7 +49,7 @@ def update_splash_text(text):
 
 def close_splash():
     """Close splash screen - Windows only (PyInstaller)"""
-    if not SPLASH_AVAILABLE or SPLASH_TYPE != 'pyi':
+    if not SPLASH_AVAILABLE:
         return
         
     try:
@@ -901,14 +901,11 @@ def main():
     update_splash_text("🎯 Initializing web interface...")
     if SPLASH_AVAILABLE:
         time.sleep(0.4)
-    update_splash_text("🗺️ Loading GPS components...")
-    if SPLASH_AVAILABLE:
+        update_splash_text("🗺️ Loading GPS components...")
         time.sleep(0.3)
-    update_splash_text("🎥 Preparing video player...")
-    if SPLASH_AVAILABLE:
+        update_splash_text("🎥 Preparing video player...")
         time.sleep(0.3)
-    update_splash_text("✨ Almost ready...")
-    if SPLASH_AVAILABLE:
+        update_splash_text("✨ Almost ready...")
         time.sleep(0.4)
     
     # Wait a moment for server to start
@@ -925,7 +922,7 @@ def main():
         
         print(f"Opening webview window: {window_url}")
         
-        # Create and start webview
+        # Import webview here to ensure it's available (already imported at top for Windows)
         webview.create_window(
             "Streamer Viewer", 
             window_url,
