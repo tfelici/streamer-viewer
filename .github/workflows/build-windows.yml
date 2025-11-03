@@ -27,19 +27,9 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
-    - name: Build executable with splash screen
+    - name: Build executable with advanced splash screen
       run: |
-        python -m PyInstaller --onefile --noconsole `
-        --name StreamerViewer `
-        --add-data "templates;templates" `
-        --add-data "static;static" `
-        --add-data "splash.png;." `
-        --splash splash.png `
-        --hidden-import webview `
-        --hidden-import flask `
-        --hidden-import requests `
-        --hidden-import pymediainfo `
-        main.py
+        python -m PyInstaller StreamerViewer.spec
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
