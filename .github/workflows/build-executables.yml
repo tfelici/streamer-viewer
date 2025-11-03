@@ -278,32 +278,48 @@ jobs:
                 # Core Flask dependencies
                 'flask',
                 'werkzeug',
+                'werkzeug.utils',
                 'jinja2',
                 'markupsafe',
                 'click',
                 'itsdangerous',
-                # HTTP requests
+                # HTTP requests and related
                 'requests',
                 'urllib3',
-                'certifi',
+                'certifi', 
                 'charset_normalizer',
                 'idna',
-                # File upload support
                 'requests_toolbelt',
+                'requests_toolbelt.multipart',
+                'requests_toolbelt.multipart.encoder',
                 # Media info for video files
                 'pymediainfo',
-                # Browser launching
+                # Browser launching (webbrowser is stdlib, but ensure it's included)
                 'webbrowser',
-                # Essential Python modules
+                # Standard library modules that might need explicit inclusion
+                'struct',
+                'uuid', 
                 'json',
+                'threading',
+                'socket',
+                'ssl',  # Needed for HTTPS requests
+                'glob',
+                're',
                 'datetime',
+                'time',
                 'os',
                 'sys',
-                're',
-                'threading',
-                'time',
-                'socket',
-                'glob',
+                'email.utils',  # Often needed by HTTP libraries
+                'email.message',  # Often needed by HTTP libraries
+                'zipfile',  # Critical for PyInstaller operation
+                'io',  # Standard I/O operations
+                'tempfile',  # Temporary files
+                'shutil',  # File operations
+                'subprocess',  # Process management
+                'pathlib',  # Path handling
+                'collections',  # Standard collections
+                'functools',  # Functional tools
+                'itertools',  # Iterator tools
             ],
             hookspath=[],
             hooksconfig={},
@@ -376,8 +392,7 @@ jobs:
                 'xml',
                 'xmlrpc',
                 'lxml',
-                # Exclude compression/archiving
-                'zipfile',
+                # Exclude compression/archiving (but keep zipfile as it's essential for PyInstaller)
                 'tarfile',
                 'gzip',
                 'bz2',
