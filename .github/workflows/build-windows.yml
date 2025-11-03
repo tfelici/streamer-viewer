@@ -31,8 +31,12 @@ jobs:
       run: |
         python -m PyInstaller StreamerViewer.spec
 
+    - name: Rename executable to final name
+      run: |
+        copy dist\StreamerViewer.exe dist\StreamerViewer-windows.exe
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: StreamerViewer-windows
-        path: dist/StreamerViewer.exe
+        path: dist/StreamerViewer-windows.exe

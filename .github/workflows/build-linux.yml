@@ -36,8 +36,13 @@ jobs:
       run: |
         python -m PyInstaller StreamerViewer.spec
 
+    - name: Rename executable to final name
+      run: |
+        cp dist/StreamerViewer dist/StreamerViewer-linux
+        chmod +x dist/StreamerViewer-linux
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: StreamerViewer-linux
-        path: dist/StreamerViewer
+        path: dist/StreamerViewer-linux

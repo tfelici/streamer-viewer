@@ -46,6 +46,8 @@ jobs:
         echo "Downloaded artifacts:"
         find release-artifacts -type f -ls
 
+
+
     - name: Get version and branch info
       id: get_version
       run: |
