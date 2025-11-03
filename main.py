@@ -26,7 +26,6 @@ import struct
 # Splash screen support - Platform-specific
 SPLASH_AVAILABLE = False
 SPLASH_TYPE = None
-qt_splash = None
 
 try:
     # Try PyInstaller splash first (Windows)
@@ -34,74 +33,39 @@ try:
     SPLASH_AVAILABLE = True
     SPLASH_TYPE = 'pyi'
 except ImportError:
-    # Try Qt splash (Linux/macOS)
-    try:
-        from PyQt5.QtWidgets import QApplication, QSplashScreen, QLabel
-        from PyQt5.QtCore import Qt, QTimer
-        from PyQt5.QtGui import QPixmap
-        SPLASH_AVAILABLE = True
-        SPLASH_TYPE = 'qt'
-    except ImportError:
-        pass
-
-def init_qt_splash():
-    """Initialize Qt splash screen"""
-    global qt_splash
-    if SPLASH_TYPE == 'qt':
-        try:
-            # Create QApplication if it doesn't exist
-            app = QApplication.instance()
-            if app is None:
-                app = QApplication(sys.argv)
-            
-            # Load splash image
-            splash_path = os.path.join(os.path.dirname(__file__), 'splash.png')
-            if os.path.exists(splash_path):
-                pixmap = QPixmap(splash_path)
-            else:
-                # Create a simple colored splash if image not found
-                pixmap = QPixmap(400, 300)
-                pixmap.fill(Qt.darkBlue)
-            
-            qt_splash = QSplashScreen(pixmap)
-            qt_splash.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.SplashScreen)
-            qt_splash.show()
-            app.processEvents()
-            return True
-        except Exception as e:
-            print(f"Qt splash screen init error: {e}")
-            return False
-    return False
+    # Linux/macOS: No splash screen, just use browser
+    pass
 
 def update_splash_text(text):
-    """Update splash screen text - works with both PyInstaller and Qt"""
-    global qt_splash
-    if not SPLASH_AVAILABLE:
+    """Update splash screen text - Windows only (PyInstaller)"""
+    if not SPLASH_AVAILABLE or SPLASH_TYPE != 'pyi':
+        print(f"[Streamer Viewer] {text}")  # Linux: Just print to console
         return
         
     try:
-        if SPLASH_TYPE == 'pyi':
-            pyi_splash.update_text(text)
-        elif SPLASH_TYPE == 'qt' and qt_splash:
-            qt_splash.showMessage(text, Qt.AlignBottom | Qt.AlignCenter, Qt.white)
-            QApplication.instance().processEvents()
+        pyi_splash.update_text(text)
     except Exception as e:
         print(f"Splash screen update error: {e}")
 
 def close_splash():
-    """Close splash screen - works with both types"""
-    global qt_splash
-    if not SPLASH_AVAILABLE:
+    """Close splash screen - Windows only (PyInstaller)"""
+    if not SPLASH_AVAILABLE or SPLASH_TYPE != 'pyi':
         return
         
     try:
-        if SPLASH_TYPE == 'pyi':
-            pyi_splash.close()
-        elif SPLASH_TYPE == 'qt' and qt_splash:
-            qt_splash.close()
-            qt_splash = None
+        pyi_splash.close()
     except Exception as e:
         print(f"Splash screen close error: {e}")
+
+def open_browser(url):
+    """Open URL in default browser (Linux/macOS fallback)"""
+    import webbrowser
+    try:
+        webbrowser.open(url)
+        return True
+    except Exception as e:
+        print(f"Failed to open browser: {e}")
+        return False
 
 # Add the current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -892,19 +856,17 @@ def main():
     """Main function to start the application"""
     print("Starting Streamer Viewer...")
     
-    # Initialize splash screen (Qt splash needs to be initialized)
-    if SPLASH_TYPE == 'qt':
-        init_qt_splash()
-    
-    # Update splash screen if available
+    # Update splash screen if available (Windows only)
     update_splash_text("🚀 Starting Streamer Viewer...")
-    time.sleep(1.0)  # Longer delay to see the message
+    if SPLASH_AVAILABLE:
+        time.sleep(1.0)  # Only delay if splash screen is visible
     
     print(f"Using streamer data directory: {STREAMER_DATA_DIR}")
     
     # Update splash screen if available
     update_splash_text("📁 Checking data directories...")
-    time.sleep(0.8)  # Longer delay to see the message
+    if SPLASH_AVAILABLE:
+        time.sleep(0.8)
         
     # Check if data directories exist        
     if not os.path.exists(STREAMER_DATA_DIR):
@@ -916,7 +878,8 @@ def main():
     
     # Find available port
     update_splash_text("🌐 Finding available port...")
-    time.sleep(0.3)
+    if SPLASH_AVAILABLE:
+        time.sleep(0.3)
         
     port = find_available_port()
     if not port:
@@ -927,7 +890,8 @@ def main():
     print(f"Starting server on port {port}...")
     
     update_splash_text(f"⚡ Starting web server on port {port}...")
-    time.sleep(0.4)
+    if SPLASH_AVAILABLE:
+        time.sleep(0.4)
     
     # Start Flask server in background thread
     server_thread = threading.Thread(target=start_flask_server, args=(port,))
@@ -935,37 +899,65 @@ def main():
     server_thread.start()
     
     update_splash_text("🎯 Initializing web interface...")
-    time.sleep(0.4)
+    if SPLASH_AVAILABLE:
+        time.sleep(0.4)
     update_splash_text("🗺️ Loading GPS components...")
-    time.sleep(0.3)
+    if SPLASH_AVAILABLE:
+        time.sleep(0.3)
     update_splash_text("🎥 Preparing video player...")
-    time.sleep(0.3)
+    if SPLASH_AVAILABLE:
+        time.sleep(0.3)
     update_splash_text("✨ Almost ready...")
-    time.sleep(0.4)
+    if SPLASH_AVAILABLE:
+        time.sleep(0.4)
     
     # Wait a moment for server to start
     time.sleep(0.5)
     
-    update_splash_text("✅ Ready! Opening window...")
-    time.sleep(0.3)
-    close_splash()
-    
-    # Create webview window
-    window_title = "Streamer Viewer"
+    # Platform-specific UI approach
     window_url = f"http://127.0.0.1:{port}"
     
-    print(f"Opening web viewer: {window_url}")
-    
-    # Create and start webview
-    webview.create_window(
-        window_title, 
-        window_url,
-        width=1200,
-        height=800,
-        resizable=True
-    )
-    
-    webview.start(debug=False)
+    if os.name == 'nt':  # Windows - use webview with splash
+        update_splash_text("✅ Ready! Opening window...")
+        if SPLASH_AVAILABLE:
+            time.sleep(0.3)
+        close_splash()
+        
+        print(f"Opening webview window: {window_url}")
+        
+        # Create and start webview
+        webview.create_window(
+            "Streamer Viewer", 
+            window_url,
+            width=1200,
+            height=800,
+            resizable=True
+        )
+        webview.start(debug=False)
+        
+    else:  # Linux/macOS - use browser
+        print(f"Opening in browser: {window_url}")
+        print("=" * 60)
+        print("🚀 Streamer Viewer is now running!")
+        print(f"📍 Web interface: {window_url}")
+        print("🌐 Opening in your default browser...")
+        print("❌ Close this terminal window to stop the server")
+        print("=" * 60)
+        
+        # Open in default browser
+        if open_browser(window_url):
+            print("✅ Browser opened successfully")
+        else:
+            print("⚠️  Could not open browser automatically")
+            print(f"   Please open {window_url} manually")
+        
+        # Keep server running
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n👋 Shutting down Streamer Viewer...")
+            return
 
 if __name__ == '__main__':
     main()

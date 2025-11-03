@@ -64,38 +64,22 @@ jobs:
         python --version
         python -m pip --version
 
-    - name: Install system dependencies (Ubuntu) - Complete QT system packages
+    - name: Install system dependencies (Ubuntu) - Browser-based approach
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
         
-        # Install QT dependencies + pywebview system package as per documentation  
-        # https://pywebview.flowrl.com/guide/installation.html#linux
-        # "Starting from Ubuntu Disco Dingo pywebview can be installed via apt as python3-webview"
+        # Install minimal dependencies for browser-based Flask app
         sudo apt-get install -y \
-          python3-pyqt5 \
-          python3-pyqt5.qtwebengine \
-          python3-pyqt5.qtwebchannel \
-          libqt5webkit5-dev \
-          python3-webview \
           python3-flask \
           python3-requests \
           python3-pil \
           python3-setuptools \
           python3-pkg-resources \
           python3-pip
-          
-        # Check what other packages are available as system packages
-        echo "Available Python system packages:"
-        apt-cache search python3- | grep -E "(webview|media|jaraco|installer)" || echo "No additional packages found"
         
         echo "Current Python: $(python --version)"
         echo "Python path: $(which python)"
-        
-        # Verify system QT packages are installed
-        echo "Verifying system QT packages..."
-        python3 -c "from PyQt5 import QtCore; print('✓ PyQt5 QtCore version:', QtCore.QT_VERSION_STR)" || echo "✗ PyQt5 not available"
-        python3 -c "from PyQt5 import QtWebEngineWidgets; print('✓ PyQt5 QtWebEngineWidgets available')" || echo "✗ QtWebEngine not available"
         
         # Clean pip environment  
         python3 -m pip install --upgrade pip setuptools wheel
@@ -103,59 +87,25 @@ jobs:
     - name: Install system dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        brew install gtk+3 gobject-introspection
+        # macOS uses browser approach like Linux, no additional GUI dependencies needed
+        echo "macOS will use browser-based approach"
 
     - name: Install minimal Python dependencies via pip (Linux)
       if: matrix.platform == 'linux'
       run: |
-        # Only install what's absolutely necessary via pip - everything else from system packages
-        echo "Installing minimal pip dependencies..."
+        # Browser-based approach - minimal dependencies
+        echo "Installing minimal pip dependencies for browser-based app..."
         
-        # Check what we can avoid installing
-        python3 -c "import pkg_resources; print('✓ pkg_resources from system')" || echo "Need pkg_resources fix"
-        python3 -c "import setuptools; print('✓ setuptools from system')" || echo "Need setuptools"
-        
-        # Install ONLY what's not available as system packages:
+        # Install only essential packages not available as system packages:
         python3 -m pip install --user pyinstaller  # Not available as system package
         python3 -m pip install --user requests-toolbelt  # Extension, not in system
-        # pywebview now installed via system package python3-webview
         python3 -m pip install --user pymediainfo  # Not in system
         
-        # Try to avoid jaraco packages by using system pkg_resources
-        python3 -c "
-        try:
-            import pkg_resources
-            print('✓ Using system pkg_resources - no jaraco packages needed')
-        except ImportError:
-            print('✗ Need to install jaraco packages for pkg_resources')
-            import subprocess
-            subprocess.run(['python3', '-m', 'pip', 'install', '--user', 'jaraco.text', 'jaraco.functools', 'jaraco.collections', 'importlib-metadata'])
-        "
-        
-        # Verify we can use system packages and check QT version
+        # Verify system packages are accessible
         echo "Verifying system packages are accessible..."
         python3 -c "import flask; print('✓ Flask from system packages')" || echo "✗ Flask not available"
         python3 -c "import requests; print('✓ Requests from system packages')" || echo "✗ Requests not available"  
         python3 -c "from PIL import Image; print('✓ Pillow from system packages')" || echo "✗ Pillow not available"
-        python3 -c "
-        from PyQt5 import QtCore, QtWebEngineWidgets
-        print('✓ QT from system packages')
-        print(f'✓ QT version: {QtCore.QT_VERSION_STR}')
-        print('✓ QtWebEngineWidgets available for pywebview')
-        " || echo "✗ QT WebEngine not available or wrong version"
-        
-        # Test system pywebview with QT backend
-        python3 -c "
-        import pywebview
-        print('✓ pywebview available via system package')
-        print('pywebview location:', pywebview.__file__)
-        # Check if QT backend is available
-        try:
-            from pywebview.platforms import qt
-            print('✓ pywebview QT platform backend available')
-        except ImportError as e:
-            print('✗ pywebview QT backend not available:', e)
-        " || echo "✗ System pywebview test failed"
         
     - name: Install Python dependencies (Windows/macOS)
       if: matrix.platform != 'linux'
