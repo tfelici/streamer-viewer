@@ -28,29 +28,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install Flask requests requests-toolbelt Pillow pyinstaller pywebview pymediainfo
 
-    - name: Build executable with PyInstaller
+    - name: Build executable with PyInstaller (using spec file for splash screen)
       run: |
-        pyinstaller --onefile --windowed --name StreamerViewer `
-          --add-data "templates;templates" `
-          --add-data "static;static" `
-          --add-data "splash.png;." `
-          --splash "splash.png" `
-          --hidden-import=webview `
-          --hidden-import=webview.platforms.winforms `
-          --hidden-import=pymediainfo `
-          --hidden-import=flask `
-          --hidden-import=requests `
-          --hidden-import=pyi_splash `
-          --exclude-module=tkinter `
-          --exclude-module=matplotlib `
-          --exclude-module=numpy `
-          --exclude-module=scipy `
-          --exclude-module=pandas `
-          --exclude-module=PyQt5 `
-          --exclude-module=PyQt6 `
-          --exclude-module=PySide2 `
-          --exclude-module=PySide6 `
-          main.py
+        # Build using the spec file (same as local build)
+        python -m PyInstaller StreamerViewer.spec --noconfirm --clean
 
     - name: Create artifacts directory
       run: |
