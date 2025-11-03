@@ -6,11 +6,10 @@ on:
       artifact-name:
         description: "Name of the Windows artifact"
         value: "StreamerViewer-windows"
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
 
 jobs:
   build-windows:
-    name: Build Windows Executable
     runs-on: windows-latest
     
     steps:
@@ -21,97 +20,29 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.12'
-        cache: 'pip'
 
-    - name: Install Python dependencies
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install Flask requests requests-toolbelt Pillow pyinstaller pywebview pymediainfo
+        pip install -r requirements.txt
+        pip install pyinstaller
 
-    - name: Build executable with PyInstaller (command-line with splash screen)
+    - name: Build executable with splash screen
       run: |
-        python -m PyInstaller --onefile --noconsole --name StreamerViewer `
+        python -m PyInstaller --onefile --noconsole `
+        --name StreamerViewer `
         --add-data "templates;templates" `
         --add-data "static;static" `
         --add-data "splash.png;." `
         --splash splash.png `
         --hidden-import webview `
-        --hidden-import webview.platforms.winforms `
-        --hidden-import webview.platforms.cef `
-        --hidden-import webview.platforms.qt `
         --hidden-import flask `
-        --hidden-import flask.json `
-        --hidden-import flask.templating `
-        --hidden-import jinja2 `
-        --hidden-import jinja2.ext `
-        --hidden-import markupsafe `
         --hidden-import requests `
-        --hidden-import requests.adapters `
-        --hidden-import requests.auth `
-        --hidden-import requests.cookies `
-        --hidden-import requests.exceptions `
-        --hidden-import requests.models `
-        --hidden-import requests.sessions `
-        --hidden-import requests.structures `
-        --hidden-import requests.utils `
-        --hidden-import urllib3 `
-        --hidden-import urllib3.contrib `
-        --hidden-import urllib3.util `
-        --hidden-import urllib3.util.retry `
-        --hidden-import urllib3.poolmanager `
-        --hidden-import certifi `
-        --hidden-import charset_normalizer `
-        --hidden-import idna `
-        --hidden-import threading `
-        --hidden-import json `
-        --hidden-import datetime `
-        --hidden-import werkzeug `
-        --hidden-import werkzeug.utils `
-        --hidden-import werkzeug.serving `
-        --hidden-import werkzeug.security `
-        --hidden-import click `
-        --hidden-import itsdangerous `
-        --hidden-import socket `
-        --hidden-import sys `
-        --hidden-import os `
-        --hidden-import re `
-        --hidden-import time `
-        --hidden-import uuid `
-        --hidden-import ctypes `
-        --hidden-import ctypes.wintypes `
         --hidden-import pymediainfo `
-        --exclude-module tkinter `
-        --exclude-module matplotlib `
-        --exclude-module numpy `
-        --exclude-module scipy `
-        --exclude-module pandas `
-        --exclude-module PyQt5 `
-        --exclude-module PyQt6 `
-        --exclude-module PySide2 `
-        --exclude-module PySide6 `
-        --noconfirm --clean `
         main.py
 
-    - name: Create artifacts directory
-      run: |
-        New-Item -ItemType Directory -Force -Path "artifacts"
-
-    - name: Prepare Windows artifacts
-      run: |
-        Copy-Item "dist\StreamerViewer.exe" "artifacts\StreamerViewer-windows.exe"
-        Write-Output "Windows executable copied to artifacts"
-
-    - name: List build output
-      run: |
-        Write-Output "Contents of artifacts directory:"
-        Get-ChildItem -Path "artifacts" | ForEach-Object {
-            $size = if ($_.PSIsContainer) { "DIR" } else { $_.Length }
-            Write-Output "  $($_.Name) ($size bytes)"
-        }
-
-    - name: Upload Windows executable artifact
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: StreamerViewer-windows
-        path: artifacts/*
-        retention-days: 90
+        path: dist/StreamerViewer.exe
