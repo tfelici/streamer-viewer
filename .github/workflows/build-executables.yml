@@ -77,8 +77,7 @@ jobs:
           python3-setuptools \
           python3-pkg-resources \
           python3-pip \
-          libmediainfo0v5 \
-          libmediainfo-dev
+          python3-pymediainfo
         
         echo "Current Python: $(python --version)"
         echo "Python path: $(which python)"
@@ -102,18 +101,16 @@ jobs:
         python3 -m pip install --user pyinstaller  # Not available as system package
         python3 -m pip install --user requests-toolbelt  # Extension, not in system
         
-        # Install pymediainfo system-wide to ensure PyInstaller can find it
-        sudo python3 -m pip install pymediainfo  # Media file information library
-        
-        # Verify pymediainfo is available
-        echo "Verifying pymediainfo installation..."
-        python3 -c "import pymediainfo; print('✓ pymediainfo available')" || echo "✗ pymediainfo installation failed"
-        
-        # Verify system packages are accessible
+        # Verify system packages are available
         echo "Verifying system packages are accessible..."
+        python3 -c "import pymediainfo; print('✓ pymediainfo from system packages')" || echo "✗ pymediainfo not available"
+        
+        # Verify all system packages are accessible
+        echo "Verifying all system packages are accessible..."
         python3 -c "import flask; print('✓ Flask from system packages')" || echo "✗ Flask not available"
         python3 -c "import requests; print('✓ Requests from system packages')" || echo "✗ Requests not available"  
         python3 -c "from PIL import Image; print('✓ Pillow from system packages')" || echo "✗ Pillow not available"
+        python3 -c "import pymediainfo; print('✓ pymediainfo from system packages')" || echo "✗ pymediainfo not available"
         
     - name: Install Python dependencies (Windows/macOS)
       if: matrix.platform != 'linux'
