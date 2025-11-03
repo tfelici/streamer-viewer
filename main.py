@@ -23,12 +23,85 @@ from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 # Pure Python MP4 parsing
 import struct
 
-# Splash screen support
+# Splash screen support - Platform-specific
+SPLASH_AVAILABLE = False
+SPLASH_TYPE = None
+qt_splash = None
+
 try:
+    # Try PyInstaller splash first (Windows)
     import pyi_splash
     SPLASH_AVAILABLE = True
+    SPLASH_TYPE = 'pyi'
 except ImportError:
-    SPLASH_AVAILABLE = False
+    # Try Qt splash (Linux/macOS)
+    try:
+        from PyQt5.QtWidgets import QApplication, QSplashScreen, QLabel
+        from PyQt5.QtCore import Qt, QTimer
+        from PyQt5.QtGui import QPixmap
+        SPLASH_AVAILABLE = True
+        SPLASH_TYPE = 'qt'
+    except ImportError:
+        pass
+
+def init_qt_splash():
+    """Initialize Qt splash screen"""
+    global qt_splash
+    if SPLASH_TYPE == 'qt':
+        try:
+            # Create QApplication if it doesn't exist
+            app = QApplication.instance()
+            if app is None:
+                app = QApplication(sys.argv)
+            
+            # Load splash image
+            splash_path = os.path.join(os.path.dirname(__file__), 'splash.png')
+            if os.path.exists(splash_path):
+                pixmap = QPixmap(splash_path)
+            else:
+                # Create a simple colored splash if image not found
+                pixmap = QPixmap(400, 300)
+                pixmap.fill(Qt.darkBlue)
+            
+            qt_splash = QSplashScreen(pixmap)
+            qt_splash.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.SplashScreen)
+            qt_splash.show()
+            app.processEvents()
+            return True
+        except Exception as e:
+            print(f"Qt splash screen init error: {e}")
+            return False
+    return False
+
+def update_splash_text(text):
+    """Update splash screen text - works with both PyInstaller and Qt"""
+    global qt_splash
+    if not SPLASH_AVAILABLE:
+        return
+        
+    try:
+        if SPLASH_TYPE == 'pyi':
+            pyi_splash.update_text(text)
+        elif SPLASH_TYPE == 'qt' and qt_splash:
+            qt_splash.showMessage(text, Qt.AlignBottom | Qt.AlignCenter, Qt.white)
+            QApplication.instance().processEvents()
+    except Exception as e:
+        print(f"Splash screen update error: {e}")
+
+def close_splash():
+    """Close splash screen - works with both types"""
+    global qt_splash
+    if not SPLASH_AVAILABLE:
+        return
+        
+    try:
+        if SPLASH_TYPE == 'pyi':
+            pyi_splash.close()
+        elif SPLASH_TYPE == 'qt' and qt_splash:
+            qt_splash.close()
+            qt_splash = None
+    except Exception as e:
+        print(f"Splash screen close error: {e}")
 
 # Add the current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -819,23 +892,19 @@ def main():
     """Main function to start the application"""
     print("Starting Streamer Viewer...")
     
+    # Initialize splash screen (Qt splash needs to be initialized)
+    if SPLASH_TYPE == 'qt':
+        init_qt_splash()
+    
     # Update splash screen if available
-    if SPLASH_AVAILABLE:
-        try:
-            pyi_splash.update_text("🚀 Starting Streamer Viewer...")
-            time.sleep(1.0)  # Longer delay to see the message
-        except Exception as e:
-            print(f"Splash screen update error: {e}")
+    update_splash_text("🚀 Starting Streamer Viewer...")
+    time.sleep(1.0)  # Longer delay to see the message
     
     print(f"Using streamer data directory: {STREAMER_DATA_DIR}")
     
     # Update splash screen if available
-    if SPLASH_AVAILABLE:
-        try:
-            pyi_splash.update_text("📁 Checking data directories...")
-            time.sleep(0.8)  # Longer delay to see the message
-        except Exception as e:
-            print(f"Splash screen update error: {e}")
+    update_splash_text("📁 Checking data directories...")
+    time.sleep(0.8)  # Longer delay to see the message
         
     # Check if data directories exist        
     if not os.path.exists(STREAMER_DATA_DIR):
@@ -846,60 +915,40 @@ def main():
         print(f"Warning: Recordings directory not found: {RECORDINGS_DIR}")
     
     # Find available port
-    if SPLASH_AVAILABLE:
-        try:
-            pyi_splash.update_text("🌐 Finding available port...")
-            time.sleep(0.3)
-        except Exception as e:
-            print(f"Splash screen update error: {e}")
+    update_splash_text("🌐 Finding available port...")
+    time.sleep(0.3)
         
     port = find_available_port()
     if not port:
         print("No available ports found!")
-        if SPLASH_AVAILABLE:
-            try:
-                pyi_splash.close()
-            except:
-                pass
+        close_splash()
         return
     
     print(f"Starting server on port {port}...")
     
-    if SPLASH_AVAILABLE:
-        try:
-            pyi_splash.update_text(f"⚡ Starting web server on port {port}...")
-            time.sleep(0.4)
-        except Exception as e:
-            print(f"Splash screen update error: {e}")
+    update_splash_text(f"⚡ Starting web server on port {port}...")
+    time.sleep(0.4)
     
     # Start Flask server in background thread
     server_thread = threading.Thread(target=start_flask_server, args=(port,))
     server_thread.daemon = True
     server_thread.start()
     
-    if SPLASH_AVAILABLE:
-        try:
-            pyi_splash.update_text("🎯 Initializing web interface...")
-            time.sleep(0.4)
-            pyi_splash.update_text("🗺️ Loading GPS components...")
-            time.sleep(0.3)
-            pyi_splash.update_text("🎥 Preparing video player...")
-            time.sleep(0.3)
-            pyi_splash.update_text("✨ Almost ready...")
-            time.sleep(0.4)
-        except Exception as e:
-            print(f"Splash screen update error: {e}")
+    update_splash_text("🎯 Initializing web interface...")
+    time.sleep(0.4)
+    update_splash_text("🗺️ Loading GPS components...")
+    time.sleep(0.3)
+    update_splash_text("🎥 Preparing video player...")
+    time.sleep(0.3)
+    update_splash_text("✨ Almost ready...")
+    time.sleep(0.4)
     
     # Wait a moment for server to start
     time.sleep(0.5)
     
-    if SPLASH_AVAILABLE:
-        try:
-            pyi_splash.update_text("✅ Ready! Opening window...")
-            time.sleep(0.3)
-            pyi_splash.close()
-        except Exception as e:
-            print(f"Splash screen close error: {e}")
+    update_splash_text("✅ Ready! Opening window...")
+    time.sleep(0.3)
+    close_splash()
     
     # Create webview window
     window_title = "Streamer Viewer"
