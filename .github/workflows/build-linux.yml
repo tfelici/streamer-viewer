@@ -188,9 +188,9 @@ jobs:
         
         # Get binary includes from environment
         binary_includes = os.environ.get('BINARY_INCLUDES', '[]')
-        print(f'Using binary includes: {binary_includes}')
+        print('Using binary includes:', binary_includes)
         
-        spec_content = f'''# -*- mode: python ; coding: utf-8 -*-
+        spec_content = '''# -*- mode: python ; coding: utf-8 -*-
         # Browser-based Flask app - minimal dependencies (no Qt required)
         
         block_cipher = None
@@ -198,7 +198,7 @@ jobs:
         a = Analysis(
             ['main.py'],
             pathex=['.'],
-            binaries={binary_includes},
+            binaries=''' + binary_includes + ''',
             datas=[
                 ('templates', 'templates'),
                 ('static', 'static'),
