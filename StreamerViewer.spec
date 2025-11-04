@@ -69,3 +69,20 @@ exe = EXE(
     upx=False,
     console=False,
 )
+
+# Create macOS app bundle for proper Dock integration
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        exe,
+        name='StreamerViewer.app',
+        icon=None,  # Add icon path here if you have one: 'icon.icns'
+        bundle_identifier='com.lambda-tek.streamer-viewer',
+        info_plist={
+            'CFBundleName': 'Streamer Viewer',
+            'CFBundleDisplayName': 'Streamer Viewer',
+            'CFBundleShortVersionString': '1.0.0',
+            'CFBundleVersion': '1.0.0',
+            'NSHighResolutionCapable': True,
+            'LSUIElement': False,  # Show in Dock (enables bouncing)
+        },
+    )

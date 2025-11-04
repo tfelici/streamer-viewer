@@ -40,12 +40,27 @@ jobs:
       run: |
         python -m PyInstaller StreamerViewer.spec
 
-    - name: Rename executable to final name
+    - name: Verify and rename macOS build
       run: |
-        cp dist/StreamerViewer dist/StreamerViewer-macos-x86_64
-        chmod +x dist/StreamerViewer-macos-x86_64
-        # Verify the architecture
-        file dist/StreamerViewer-macos-x86_64
+        echo "Verifying build output..."
+        ls -la dist/
+        
+        # Check if app bundle was created
+        if [ -d "dist/StreamerViewer.app" ]; then
+          echo "✅ macOS app bundle created successfully"
+          # Extract executable from app bundle and rename for artifact
+          cp dist/StreamerViewer.app/Contents/MacOS/StreamerViewer dist/StreamerViewer-macos-x86_64
+          chmod +x dist/StreamerViewer-macos-x86_64
+          # Verify the architecture
+          file dist/StreamerViewer-macos-x86_64
+          echo "App bundle info:"
+          ls -la dist/StreamerViewer.app/Contents/
+        else
+          echo "❌ macOS app bundle not found, falling back to regular executable"
+          cp dist/StreamerViewer dist/StreamerViewer-macos-x86_64
+          chmod +x dist/StreamerViewer-macos-x86_64
+          file dist/StreamerViewer-macos-x86_64
+        fi
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -81,12 +96,27 @@ jobs:
       run: |
         python -m PyInstaller StreamerViewer.spec
 
-    - name: Rename executable to final name
+    - name: Verify and rename macOS build
       run: |
-        cp dist/StreamerViewer dist/StreamerViewer-macos-arm64
-        chmod +x dist/StreamerViewer-macos-arm64
-        # Verify the architecture
-        file dist/StreamerViewer-macos-arm64
+        echo "Verifying build output..."
+        ls -la dist/
+        
+        # Check if app bundle was created
+        if [ -d "dist/StreamerViewer.app" ]; then
+          echo "✅ macOS app bundle created successfully"
+          # Extract executable from app bundle and rename for artifact
+          cp dist/StreamerViewer.app/Contents/MacOS/StreamerViewer dist/StreamerViewer-macos-arm64
+          chmod +x dist/StreamerViewer-macos-arm64
+          # Verify the architecture
+          file dist/StreamerViewer-macos-arm64
+          echo "App bundle info:"
+          ls -la dist/StreamerViewer.app/Contents/
+        else
+          echo "❌ macOS app bundle not found, falling back to regular executable"
+          cp dist/StreamerViewer dist/StreamerViewer-macos-arm64
+          chmod +x dist/StreamerViewer-macos-arm64
+          file dist/StreamerViewer-macos-arm64
+        fi
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
