@@ -1,31 +1,64 @@
-# Streamer Viewer
+# Streamer Viewer v2.1
 
-A comprehensive standalone Python application for viewing GPS tracks with synchronized video playback and uploading recordings from the RPI Streamer project. This unified application provides complete GPS track management and recording upload functionality in a single, user-friendly interface.
+A comprehensive standalone desktop application for GPS track analysis, synchronized video playback, and recording management from the RPI Streamer ecosystem. This unified application provides complete track visualization, video synchronization, and upload capabilities in a single, professional desktop interface.
 
-## Features
+## 🎯 Overview
 
-### 🗺️ GPS Track Visualization
-- **Interactive Maps**: Display GPS tracks as lines on Leaflet.js maps with OpenStreetMap tiles
-- **Track Management**: Browse, view, and delete GPS tracks with an intuitive interface
-- **Real-time Playback**: Timeline slider with play/pause controls and variable speed playback
-- **Video Synchronization**: Synchronized video playback with GPS position tracking
+The Streamer Viewer transforms GPS tracking data into interactive visualizations with synchronized video playback. Perfect for flight analysis, surveillance review, and GPS track management, providing desktop-grade functionality with no installation requirements.
 
-### 📡 Recording Upload & Sync
-- **Server Upload**: Upload recordings directly to your RPI Streamer server
-- **Progress Monitoring**: Real-time upload progress with cancel capability
-- **Bulk Operations**: Select and upload multiple recordings simultaneously
-- **Server Integration**: Seamless integration with Streamer Admin backend
+## 🚀 Key Features
 
-### 🎨 Modern Interface
-- **Font Awesome Icons**: Beautiful, offline-compatible icon system
-- **Responsive Design**: Works perfectly on desktop and mobile devices
-- **Gradient Themes**: Modern CSS styling with smooth animations
-- **Intuitive Navigation**: Easy switching between track viewing and recording upload modes
+### 🗺️ Advanced GPS Track Visualization
+- **Interactive Mapping**: Professional-grade track visualization using Leaflet.js with OpenStreetMap tiles
+- **Real-time Playback Engine**: 
+  - Timeline scrubbing with millisecond precision
+  - Variable speed playback (0.5x to 4x speed)
+  - Play/pause controls with position indicators
+- **Multi-Track Analysis**: Browse and compare multiple GPS tracks simultaneously
+- **Track Statistics**: Distance, duration, altitude profiles, and speed analysis
+- **Zoom & Navigation**: Full pan/zoom capabilities with position markers
 
-### 🚀 Deployment
-- **Standalone Executable**: Single-file Windows executable (~19MB)
-- **No Dependencies**: No Python installation required for end users
-- **Offline Compatible**: All assets bundled for complete offline functionality
+### 📹 Video Synchronization System
+- **Precision Sync**: Frame-accurate synchronization between GPS position and video playback
+- **Timeline Integration**: Unified timeline controlling both GPS position and video playback
+- **Video Controls**: Full video player with seek, volume, and fullscreen support
+- **Multi-Format Support**: Compatible with MP4, WebM, and other HTML5 video formats
+- **Performance Optimized**: Smooth playback with efficient memory management
+
+### 📡 Professional Recording Management
+- **Server Integration**: Direct upload to RPI Streamer server infrastructure
+- **Upload Progress Monitoring**: 
+  - Real-time progress bars with transfer speeds
+  - Cancellation support for large file uploads
+  - Error handling with retry capabilities
+- **Bulk Upload Operations**: Multi-file selection and batch processing
+- **Hierarchical Organization**: Automatic organization by domain/device/timestamp structure
+- **Metadata Extraction**: Automatic video duration and format detection using pymediainfo
+
+### 🎨 Modern Desktop Interface
+- **Professional UI Design**: 
+  - Font Awesome icon system (offline-compatible)
+  - Modern gradient themes with smooth CSS animations
+  - Responsive layout adapting to different screen sizes
+- **Intuitive Navigation**: 
+  - Seamless mode switching between viewing and upload operations
+  - Context-sensitive menus and controls
+  - Keyboard shortcuts for common operations
+- **Dark/Light Themes**: Automatic theme detection with manual override options
+
+### 🚀 Zero-Installation Deployment
+- **Standalone Windows Executable**: Single-file deployment (~19MB) with no external dependencies
+- **Complete Offline Functionality**: All assets, fonts, and libraries bundled
+- **No Python Required**: End users don't need Python installation or technical knowledge
+- **Instant Launch**: Double-click execution with immediate availability
+- **Portable Operation**: Run from USB drives or network shares without installation
+
+### 🔧 Advanced Technical Features
+- **High-Performance Rendering**: Optimized for large GPS datasets with thousands of points
+- **Memory Management**: Efficient handling of large video files and track data
+- **Cross-Platform Compatibility**: PyWebView engine supporting Windows, macOS, and Linux
+- **API Integration**: RESTful API endpoints for programmatic access and automation
+- **Server-Sent Events**: Real-time progress updates using modern web technologies
 
 ## Directory Structure
 
