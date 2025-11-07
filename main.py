@@ -631,7 +631,6 @@ def uploader():
     recording_files = get_recording_files()
     return render_template('uploader.html', 
                          recording_files=recording_files,
-                         streaming=False,
                          uploadrecordingsonly=True)
 
 @app.route('/upload-recording', methods=['POST'])
