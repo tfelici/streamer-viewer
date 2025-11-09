@@ -11,6 +11,43 @@ The USB auto-launch system consists of:
 - **Auto-launch**: Automatically runs Streamer Viewer with correct `--data-dir`
 - **Manual launcher**: GUI option for manual USB selection
 
+## � Download
+
+### Get Streamer Viewer Linux Executable
+
+Before setting up USB auto-launch, you need the Linux executable:
+
+**Download Options:**
+- 🔗 **[Latest Release](https://github.com/tfelici/streamer-viewer/releases/latest)** - Download `Streamer-Viewer-Linux` from GitHub Releases
+- 📦 **[All Releases](https://github.com/tfelici/streamer-viewer/releases)** - Browse all versions
+
+**Setup:**
+1. Download the `Streamer-Viewer-Linux` executable
+2. Place it on your USB drive alongside the `streamerData` folder, OR
+3. Copy it to `~/Desktop/Streamer-Viewer-Linux` manually
+4. Make executable: `chmod +x Streamer-Viewer-Linux`
+
+The USB auto-launch system will automatically copy/update the executable from USB to desktop when needed.
+
+## 📥 Quick Download
+
+**Installation Scripts:**
+- 🔗 **[install_usb_autolaunch.sh](https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh)** - Right-click → Save As
+- 🔗 **[uninstall_usb_autolaunch.sh](https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh)** - Right-click → Save As
+
+**Quick Installation:**
+```bash
+# Using curl
+curl -O https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh
+chmod +x install_usb_autolaunch.sh
+sudo ./install_usb_autolaunch.sh
+
+# Or using wget
+wget https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh
+chmod +x install_usb_autolaunch.sh
+sudo ./install_usb_autolaunch.sh
+```
+
 ## 🚀 Installation
 
 ### Prerequisites
@@ -171,11 +208,16 @@ USB_EXECUTABLE="$mount_point/Your-Custom-Executable-Name"
 
 ## 🚫 Uninstallation
 
+**Quick Uninstall:**
 ```bash
-# Make uninstaller executable
+# Download and run uninstaller
+curl -O https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh
 chmod +x uninstall_usb_autolaunch.sh
+sudo ./uninstall_usb_autolaunch.sh
 
-# Run uninstaller with sudo
+# Or using wget
+wget https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh
+chmod +x uninstall_usb_autolaunch.sh
 sudo ./uninstall_usb_autolaunch.sh
 ```
 
