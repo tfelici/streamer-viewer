@@ -111,6 +111,16 @@ python main.py
 ```
 Opens webview window at `http://127.0.0.1:5001`
 
+**With Custom Data Directory:**
+```bash
+# Use a custom directory for GPS tracks and recordings
+python main.py --data-dir "C:\MyStreamerData"
+python main.py --data-dir "/home/user/streamer_data"
+```
+
+**Command Line Options:**
+- `--data-dir PATH` - Specify custom path to streamer data directory (default: `./streamerData`)
+
 **Standalone Executable:**
 ```bash
 cd windows

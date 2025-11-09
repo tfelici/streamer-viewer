@@ -2,6 +2,18 @@
 """
 Streamer Viewer - Standalone GPS Track and Video Viewer
 Displays GPS tracks as lines on a map with synchronized video playback
+
+Command line usage:
+    python main.py [--data-dir PATH]
+
+Arguments:
+    --data-dir PATH    Specify custom path to streamer data directory
+                      (default: ./streamerData)
+
+Examples:
+    python main.py
+    python main.py --data-dir "C:\\MyStreamerData"
+    python main.py --data-dir "/home/user/streamer_data"
 """
 
 import threading
@@ -11,6 +23,7 @@ import os
 import socket
 import glob
 import re
+import argparse
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file, Response
 import json
@@ -60,6 +73,16 @@ def close_splash():
     except Exception as e:
         print(f"Splash screen close error: {e}")
 
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description='Streamer Viewer - GPS Track and Video Viewer')
+    parser.add_argument(
+        '--data-dir', 
+        type=str, 
+        help='Path to the streamer data directory (default: ./streamerData)'
+    )
+    return parser.parse_args()
+
 def open_browser(url):
     """Open URL in default browser (Linux/macOS fallback)"""
     import webbrowser
@@ -76,6 +99,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 app = Flask(__name__)
 
+# Parse command line arguments
+args = parse_arguments()
+
 # Configuration
 if getattr(sys, 'frozen', False):
     # Running as compiled executable
@@ -84,7 +110,14 @@ else:
     # Running as script
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-STREAMER_DATA_DIR = os.path.join(BASE_DIR, 'streamerData')
+# Set STREAMER_DATA_DIR from command line argument or default
+if args.data_dir:
+    # Use absolute path from command line argument
+    STREAMER_DATA_DIR = os.path.abspath(args.data_dir)
+else:
+    # Use default path relative to the application directory
+    STREAMER_DATA_DIR = os.path.join(BASE_DIR, 'streamerData')
+
 TRACKS_DIR = os.path.join(STREAMER_DATA_DIR, 'tracks')
 RECORDINGS_DIR = os.path.join(STREAMER_DATA_DIR, 'recordings', 'webcam')
 
@@ -952,7 +985,10 @@ def main():
         return  # Exit without starting new server
     
     print("No existing instance found, starting new server...")
-    print(f"Using streamer data directory: {STREAMER_DATA_DIR}")
+    if args.data_dir:
+        print(f"Using custom streamer data directory: {STREAMER_DATA_DIR}")
+    else:
+        print(f"Using default streamer data directory: {STREAMER_DATA_DIR}")
     
     # Update splash screen if available
     update_splash_text("📁 Checking data directories...")
