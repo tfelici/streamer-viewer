@@ -67,6 +67,13 @@ jobs:
 
 
 
+    - name: Delete existing release (clean slate)
+      run: |
+        # Delete existing release to ensure clean assets
+        gh release delete ${{ steps.get_version.outputs.VERSION }} --yes || echo "Release doesn't exist yet"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Create/Update Release
       uses: softprops/action-gh-release@v1
       with:
