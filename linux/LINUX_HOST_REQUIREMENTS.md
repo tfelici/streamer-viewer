@@ -6,20 +6,28 @@ This document outlines the system requirements and installation steps needed on 
 
 ### For Ubuntu/Debian-based systems:
 
-#### KDE/Qt-based desktops (recommended):
+#### For KDE/Qt-based desktops (webview support):
+
+**Ubuntu 24.04+ (with t64 packages):**
 ```bash
 sudo apt update
-sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5webenginecore5 libqt5gui5
+sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5gui5t64 libqt5core5t64 libqt5widgets5 python3-pyqt5 python3-pyqt5.qtwebengine
 ```
 
-#### For KDE/Qt-based desktops (recommended and optimized):
+**Ubuntu 22.04 and earlier:**
 ```bash
-sudo apt update
-sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5webenginecore5
+sudo apt update  
+sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5gui5 libqt5core5a libqt5widgets5 python3-pyqt5 python3-pyqt5.qtwebengine
+```
+
+**If unsure of your Ubuntu version:**
+```bash
+# Try t64 packages first, if it fails, use the second command
+sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5gui5t64 libqt5core5t64 libqt5widgets5 python3-pyqt5 python3-pyqt5.qtwebengine || sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5gui5 libqt5core5a libqt5widgets5 python3-pyqt5 python3-pyqt5.qtwebengine
 ```
 
 #### For other desktop environments:
-The application will automatically fall back to browser mode if Qt5 is not available. No additional packages required for browser fallback.
+No additional packages required. The application automatically falls back to browser mode if Qt5 is unavailable (still fully functional).
 
 ### For Red Hat/Fedora/CentOS systems:
 
@@ -52,12 +60,12 @@ sudo pacman -S gtk3 webkit2gtk
 The Streamer Viewer executable requires either Qt or GTK libraries to display the webview interface:
 
 **Qt5 Libraries (preferred for KDE):**
-- `qtbase5-dev` or `qt5-qtbase` (replaces deprecated `qt5-default`)
-- `libqt5webenginewidgets5` or `qt5-qtwebengine`
-- `libqt5webenginecore5`
-- `libqt5gui5`
-- `libqt5core5a`
-- `libqt5widgets5`
+- `qtbase5-dev` (replaces deprecated `qt5-default`)
+- `libqt5webenginewidgets5` - WebEngine widgets for webview
+- `libqt5gui5t64` or `libqt5gui5` - GUI components (t64 on Ubuntu 24.04+)
+- `libqt5core5t64` or `libqt5core5a` - Core Qt5 library (t64 on Ubuntu 24.04+)
+- `libqt5widgets5` - Widget toolkit
+- `python3-pyqt5` - Python Qt5 bindings
 
 **Browser Fallback:**
 - No additional libraries required

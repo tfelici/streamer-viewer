@@ -930,30 +930,77 @@ def main():
                     try:
                         # Try Qt backend first (preferred for KDE)
                         import PyQt5.QtCore
-                        backend_available = True
-                        print("Detected PyQt5 backend for webview")
+                        # Actually test if Qt can initialize (not just import)
+                        try:
+                            from PyQt5.QtWidgets import QApplication
+                            import sys
+                            # Test if we can create a QApplication (this will fail if Qt libs missing)
+                            test_app = QApplication.instance()
+                            if test_app is None:
+                                test_app = QApplication(sys.argv)
+                            test_app.quit()  # Clean up immediately
+                            backend_available = True
+                            print("Detected working PyQt5 backend for webview")
+                        except Exception as e:
+                            print(f"PyQt5 imports but Qt libraries not functional: {e}")
+                            backend_available = False
                     except ImportError:
                         try:
                             import PyQt6.QtCore
-                            backend_available = True
-                            print("Detected PyQt6 backend for webview")
+                            try:
+                                from PyQt6.QtWidgets import QApplication
+                                import sys
+                                test_app = QApplication.instance()
+                                if test_app is None:
+                                    test_app = QApplication(sys.argv)
+                                test_app.quit()
+                                backend_available = True
+                                print("Detected working PyQt6 backend for webview")
+                            except Exception as e:
+                                print(f"PyQt6 imports but Qt libraries not functional: {e}")
+                                backend_available = False
                         except ImportError:
                             try:
                                 import PySide2.QtCore
-                                backend_available = True
-                                print("Detected PySide2 backend for webview")
+                                try:
+                                    from PySide2.QtWidgets import QApplication
+                                    import sys
+                                    test_app = QApplication.instance()
+                                    if test_app is None:
+                                        test_app = QApplication(sys.argv)
+                                    test_app.quit()
+                                    backend_available = True
+                                    print("Detected working PySide2 backend for webview")
+                                except Exception as e:
+                                    print(f"PySide2 imports but Qt libraries not functional: {e}")
+                                    backend_available = False
                             except ImportError:
                                 try:
                                     import PySide6.QtCore
-                                    backend_available = True
-                                    print("Detected PySide6 backend for webview")
+                                    try:
+                                        from PySide6.QtWidgets import QApplication
+                                        import sys
+                                        test_app = QApplication.instance()
+                                        if test_app is None:
+                                            test_app = QApplication(sys.argv)
+                                        test_app.quit()
+                                        backend_available = True
+                                        print("Detected working PySide6 backend for webview")
+                                    except Exception as e:
+                                        print(f"PySide6 imports but Qt libraries not functional: {e}")
+                                        backend_available = False
                                 except ImportError:
                                     backend_available = False
                     
                     if not backend_available:
-                        print("No suitable GUI backend found for webview (need PyQt5/6 or PySide2/6)")
-                        print("For KDE desktop, install with: pip install PyQt5 PyQt5-tools")
-                        print("Alternative: pip install PySide6")
+                        print("No functional GUI backend found for webview")
+                        print("Qt5 system libraries may be missing.")
+                        print("To enable webview, install Qt5 libraries:")
+                        print("  # Ubuntu 24.04+:")
+                        print("  sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5gui5t64 libqt5core5t64 python3-pyqt5 python3-pyqt5.qtwebengine")
+                        print("  # Ubuntu 22.04-:")  
+                        print("  sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5gui5 libqt5core5a python3-pyqt5 python3-pyqt5.qtwebengine")
+                        print("Will use browser fallback mode (still fully functional).")
                         webview_available = False
                     else:
                         webview_available = True

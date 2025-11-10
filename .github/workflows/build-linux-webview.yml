@@ -133,19 +133,11 @@ jobs:
             'datetime',
         ]
         
-        # Collect data files
+        # Collect data files only (Qt5 libraries installed separately on host)
         datas = [
             ('templates', 'templates'),
             ('static', 'static'),
         ]
-        
-        # Try to collect Qt data files
-        try:
-            import PyQt5
-            pyqt5_datas = collect_data_files('PyQt5')
-            datas.extend(pyqt5_datas)
-        except ImportError:
-            pass
         
         a = Analysis(
             ['main.py'],
