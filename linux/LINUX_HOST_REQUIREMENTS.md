@@ -1,6 +1,6 @@
-# Linux Host Requirements for Streamer Viewer with Webview
+# Linux Host Requirements for Streamer Viewer with Qt5 Webview
 
-This document outlines the system requirements and installation steps needed on the target Linux machine to run the Streamer Viewer executable with webview support.
+This document outlines the system requirements and installation steps needed on the target Linux machine to run the Streamer Viewer executable with Qt5 webview support. This build is optimized for KDE desktop environments.
 
 ## Quick Install Commands
 
@@ -12,17 +12,14 @@ sudo apt update
 sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5webenginecore5 libqt5gui5
 ```
 
-#### GNOME/GTK-based desktops:
-```bash
-sudo apt update  
-sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 gir1.2-webkit2-4.1
-```
-
-#### Universal installation (works on most desktops):
+#### For KDE/Qt-based desktops (recommended and optimized):
 ```bash
 sudo apt update
-sudo apt install qtbase5-dev libqt5webenginewidgets5 libgtk-3-0 libwebkit2gtk-4.1-0
+sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5webenginecore5
 ```
+
+#### For other desktop environments:
+The application will automatically fall back to browser mode if Qt5 is not available. No additional packages required for browser fallback.
 
 ### For Red Hat/Fedora/CentOS systems:
 
@@ -62,11 +59,9 @@ The Streamer Viewer executable requires either Qt or GTK libraries to display th
 - `libqt5core5a`
 - `libqt5widgets5`
 
-**GTK3 Libraries (fallback for GNOME):**
-- `libgtk-3-0` or `gtk3`
-- `libwebkit2gtk-4.1-0` or `webkit2gtk3` (updated from 4.0 to 4.1)
-- `gir1.2-webkit2-4.1`
-- `libgirepository1.0`
+**Browser Fallback:**
+- No additional libraries required
+- Uses system default web browser if Qt5 unavailable
 
 ### Additional Runtime Dependencies
 

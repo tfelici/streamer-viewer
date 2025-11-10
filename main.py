@@ -948,29 +948,12 @@ def main():
                                     backend_available = True
                                     print("Detected PySide6 backend for webview")
                                 except ImportError:
-                                    try:
-                                        # Fallback to GTK - try newer WebKit first, then older
-                                        import gi
-                                        gi.require_version('Gtk', '3.0')
-                                        from gi.repository import Gtk
-                                        try:
-                                            gi.require_version('WebKit2', '4.1')
-                                            print("Detected GTK3 backend with WebKit2 4.1 for webview")
-                                        except ValueError:
-                                            try:
-                                                gi.require_version('WebKit2', '4.0')
-                                                print("Detected GTK3 backend with WebKit2 4.0 for webview")
-                                            except ValueError:
-                                                print("Detected GTK3 backend (WebKit may be limited)")
-                                        backend_available = True
-                                    except ImportError:
-                                        backend_available = False
+                                    backend_available = False
                     
                     if not backend_available:
-                        print("No suitable GUI backend found for webview (need PyQt5/6, PySide2/6, or GTK3)")
+                        print("No suitable GUI backend found for webview (need PyQt5/6 or PySide2/6)")
                         print("For KDE desktop, install with: pip install PyQt5 PyQt5-tools")
                         print("Alternative: pip install PySide6")
-                        print("For GTK fallback: pip install PyGObject")
                         webview_available = False
                     else:
                         webview_available = True

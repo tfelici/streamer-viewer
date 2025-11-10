@@ -14,10 +14,8 @@ PyQtWebEngine>=5.15.0
 # PySide6>=6.5.0
 # PySide6-WebEngine>=6.5.0
 
-# GTK backend fallback (for GNOME or other GTK-based desktops)
-# Note: PyGObject should be installed via system packages (python3-gi)
-# to avoid compilation issues with girepository-2.0
-# PyGObject>=3.42.0  # Commented out - use system package instead
+# GTK backend removed - focusing on Qt5 for KDE desktop environments
+# This build is optimized for KDE/Plasma desktop with Qt5 webview support
 
 # Required for PyInstaller builds with Qt support
 pyinstaller>=6.0.0
