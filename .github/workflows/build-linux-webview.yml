@@ -244,7 +244,7 @@ jobs:
         fi
     
     - name: Upload Linux executable
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Viewer-linux-webview
         path: dist/Viewer-linux
@@ -279,7 +279,7 @@ jobs:
         cat build-info.md
     
     - name: Upload build info
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-info
         path: build-info.md
