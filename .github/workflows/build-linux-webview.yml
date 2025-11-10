@@ -40,15 +40,16 @@ jobs:
           qt5-qmake \
           qtbase5-dev-tools
         
-        # GTK3 system libraries (fallback)
+        # GTK3 system libraries (fallback) - Updated for Ubuntu 22.04+
         sudo apt-get install -y \
           libgtk-3-dev \
-          libwebkit2gtk-4.0-dev \
+          libwebkit2gtk-4.1-dev \
           libgirepository1.0-dev \
           gir1.2-gtk-3.0 \
-          gir1.2-webkit2-4.0 \
+          gir1.2-webkit2-4.1 \
           python3-gi \
-          python3-gi-cairo
+          python3-gi-cairo \
+          libwebkit2gtk-4.1-0
         
         # Additional GUI dependencies
         sudo apt-get install -y \
@@ -268,12 +269,12 @@ jobs:
         echo "" >> build-info.md
         echo "**For GNOME/GTK-based desktops:**" >> build-info.md
         echo "\`\`\`bash" >> build-info.md
-        echo "sudo apt install libgtk-3-0 libwebkit2gtk-4.0-37" >> build-info.md
+        echo "sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0" >> build-info.md
         echo "\`\`\`" >> build-info.md
         echo "" >> build-info.md
         echo "**Universal (works on most systems):**" >> build-info.md
         echo "\`\`\`bash" >> build-info.md
-        echo "sudo apt install qtbase5-dev libqt5webenginewidgets5 libgtk-3-0 libwebkit2gtk-4.0-37" >> build-info.md
+        echo "sudo apt install qtbase5-dev libqt5webenginewidgets5 libgtk-3-0 libwebkit2gtk-4.1-0" >> build-info.md
         echo "\`\`\`" >> build-info.md
         
         cat build-info.md

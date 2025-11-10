@@ -949,12 +949,20 @@ def main():
                                     print("Detected PySide6 backend for webview")
                                 except ImportError:
                                     try:
-                                        # Fallback to GTK
+                                        # Fallback to GTK - try newer WebKit first, then older
                                         import gi
                                         gi.require_version('Gtk', '3.0')
                                         from gi.repository import Gtk
+                                        try:
+                                            gi.require_version('WebKit2', '4.1')
+                                            print("Detected GTK3 backend with WebKit2 4.1 for webview")
+                                        except ValueError:
+                                            try:
+                                                gi.require_version('WebKit2', '4.0')
+                                                print("Detected GTK3 backend with WebKit2 4.0 for webview")
+                                            except ValueError:
+                                                print("Detected GTK3 backend (WebKit may be limited)")
                                         backend_available = True
-                                        print("Detected GTK3 backend for webview")
                                     except ImportError:
                                         backend_available = False
                     

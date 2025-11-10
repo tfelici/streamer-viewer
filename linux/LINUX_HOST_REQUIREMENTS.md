@@ -15,13 +15,13 @@ sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5webenginecore5 libqt5
 #### GNOME/GTK-based desktops:
 ```bash
 sudo apt update  
-sudo apt install libgtk-3-0 libwebkit2gtk-4.0-37 gir1.2-webkit2-4.0
+sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 gir1.2-webkit2-4.1
 ```
 
 #### Universal installation (works on most desktops):
 ```bash
 sudo apt update
-sudo apt install qtbase5-dev libqt5webenginewidgets5 libgtk-3-0 libwebkit2gtk-4.0-37
+sudo apt install qtbase5-dev libqt5webenginewidgets5 libgtk-3-0 libwebkit2gtk-4.1-0
 ```
 
 ### For Red Hat/Fedora/CentOS systems:
@@ -33,7 +33,7 @@ sudo dnf install qt5-qtbase qt5-qtwebengine qt5-qtwebkit
 
 #### GNOME/GTK-based desktops:
 ```bash
-sudo dnf install gtk3 webkit2gtk3
+sudo dnf install gtk3 webkit2gtk4.1
 ```
 
 ### For Arch Linux:
@@ -64,8 +64,8 @@ The Streamer Viewer executable requires either Qt or GTK libraries to display th
 
 **GTK3 Libraries (fallback for GNOME):**
 - `libgtk-3-0` or `gtk3`
-- `libwebkit2gtk-4.0-37` or `webkit2gtk3`
-- `gir1.2-webkit2-4.0`
+- `libwebkit2gtk-4.1-0` or `webkit2gtk3` (updated from 4.0 to 4.1)
+- `gir1.2-webkit2-4.1`
 - `libgirepository1.0`
 
 ### Additional Runtime Dependencies
