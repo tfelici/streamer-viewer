@@ -44,18 +44,18 @@ TIMESTAMP=$(date +%s)
 curl -O "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?v=$TIMESTAMP"
 mv "install_usb_autolaunch.sh?v=$TIMESTAMP" install_usb_autolaunch.sh
 chmod +x install_usb_autolaunch.sh
-sudo ./install_usb_autolaunch.sh
+./install_usb_autolaunch.sh
 
 # Or using wget (cache-busted)  
 TIMESTAMP=$(date +%s)
 wget -O install_usb_autolaunch.sh "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?v=$TIMESTAMP"
 chmod +x install_usb_autolaunch.sh
-sudo ./install_usb_autolaunch.sh
+./install_usb_autolaunch.sh
 
 # Simple version (may use cached file)
 curl -O https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh
 chmod +x install_usb_autolaunch.sh
-sudo ./install_usb_autolaunch.sh
+./install_usb_autolaunch.sh
 ```
 
 ## 🚀 Installation
@@ -73,7 +73,7 @@ sudo ./install_usb_autolaunch.sh
 chmod +x install_usb_autolaunch.sh
 
 # Run the installer with sudo
-sudo ./install_usb_autolaunch.sh
+./install_usb_autolaunch.sh
 ```
 
 ## 📱 Usage
