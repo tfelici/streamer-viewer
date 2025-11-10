@@ -920,14 +920,65 @@ def main():
     try:
         if webview is not None:
             webview_module = webview
-            webview_available = True
+            # Test if webview can actually create windows (not just import)
+            try:
+                # Try to detect available GUI backend
+                import sys
+                if sys.platform.startswith('linux'):
+                    # On Linux, check if we have the required backends
+                    backend_available = False
+                    try:
+                        # Try Qt backend first (preferred for KDE)
+                        import PyQt5.QtCore
+                        backend_available = True
+                        print("Detected PyQt5 backend for webview")
+                    except ImportError:
+                        try:
+                            import PyQt6.QtCore
+                            backend_available = True
+                            print("Detected PyQt6 backend for webview")
+                        except ImportError:
+                            try:
+                                import PySide2.QtCore
+                                backend_available = True
+                                print("Detected PySide2 backend for webview")
+                            except ImportError:
+                                try:
+                                    import PySide6.QtCore
+                                    backend_available = True
+                                    print("Detected PySide6 backend for webview")
+                                except ImportError:
+                                    try:
+                                        # Fallback to GTK
+                                        import gi
+                                        gi.require_version('Gtk', '3.0')
+                                        from gi.repository import Gtk
+                                        backend_available = True
+                                        print("Detected GTK3 backend for webview")
+                                    except ImportError:
+                                        backend_available = False
+                    
+                    if not backend_available:
+                        print("No suitable GUI backend found for webview (need PyQt5/6, PySide2/6, or GTK3)")
+                        print("For KDE desktop, install with: pip install PyQt5 PyQt5-tools")
+                        print("Alternative: pip install PySide6")
+                        print("For GTK fallback: pip install PyGObject")
+                        webview_available = False
+                    else:
+                        webview_available = True
+                else:
+                    # On Windows/macOS, webview usually works if it imports
+                    webview_available = True
+            except Exception as e:
+                print(f"Webview backend test failed: {e}")
+                webview_available = False
         else:
             # Try dynamic import
             import webview as webview_module
             webview_available = True
-    except (ImportError, NameError):
+    except (ImportError, NameError) as e:
         webview_available = False
-        print("Webview not available, will use browser fallback")
+        print(f"Webview not available: {e}, will use browser fallback")
     
     # Update splash screen if available (PyInstaller builds)
     update_splash_text("🚀 Starting Streamer Viewer...")

@@ -1,383 +1,525 @@
 #!/bin/bash
-#
-# Streamer Viewer USB Auto-Launch Installer for Linux
-# 
-# This script installs a udev rule that automatically detects USB sticks
-# containing streamerData folders and launches the Streamer Viewer application
-# with the correct --data-dir parameter.
-#
-# Usage: sudo ./install_usb_autolaunch.sh
-#
+
+# RPI Streamer USB Autolaunch Installation Script
+# This script sets up automatic launching of the Streamer Viewer when a USB drive with streamerData is inserted
 
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+USERNAME=$(whoami)
+MOUNT_POINT="/mnt/rpistreamer"
+DESKTOP_DIR="$HOME/Desktop"
+UDEV_RULE_FILE="/etc/udev/rules.d/99-rpi-streamer-usb.rules"
+USB_HANDLER_SCRIPT="/usr/local/bin/rpi-streamer-usb-handler.sh"
+SYSTEMD_SERVICE="/etc/systemd/system/rpi-streamer-usb@.service"
+SYSTEMD_REMOVAL_SERVICE="/etc/systemd/system/rpi-streamer-usb-remove@.service"
 
-# Configuration
-UDEV_RULE_FILE="/etc/udev/rules.d/99-streamer-viewer-usb.rules"
-HANDLER_SCRIPT="/usr/local/bin/streamer-viewer-usb-handler.sh"
-DESKTOP_ENTRY="/usr/share/applications/streamer-viewer-usb.desktop"
+echo "=== RPI Streamer USB Autolaunch Setup ==="
+echo "Username: $USERNAME"
+echo "Mount point: $MOUNT_POINT"
+echo "Desktop directory: $DESKTOP_DIR"
+echo
 
-echo -e "${BLUE}Streamer Viewer USB Auto-Launch Installer${NC}"
-echo -e "${BLUE}=========================================${NC}"
-echo ""
-
-# Check if running as root
-if [[ $EUID -ne 0 ]]; then
-   echo -e "${RED}Error: This script must be run as root (use sudo)${NC}"
-   echo "Usage: sudo ./install_usb_autolaunch.sh"
+# Check if running as root for udev rule installation
+if [[ $EUID -eq 0 ]]; then
+   echo "Error: This script should not be run as root. Run as regular user, it will ask for sudo when needed."
    exit 1
 fi
 
-# Get the actual user (not root when using sudo)
-if [ "$SUDO_USER" ]; then
-    ACTUAL_USER="$SUDO_USER"
-    ACTUAL_HOME="/home/$SUDO_USER"
-else
-    echo -e "${RED}Error: Please run with sudo to maintain proper user context${NC}"
-    exit 1
-fi
-
-echo -e "${YELLOW}Installing for user: $ACTUAL_USER${NC}"
-echo -e "${YELLOW}User home directory: $ACTUAL_HOME${NC}"
-echo ""
-
-# Create the USB handler script
-echo -e "${BLUE}Creating USB detection handler script...${NC}"
-cat > "$HANDLER_SCRIPT" << 'EOF'
+# Function to create the USB handler script
+create_usb_handler() {
+    echo "Creating USB handler script..."
+    
+    sudo tee "$USB_HANDLER_SCRIPT" > /dev/null << 'EOF'
 #!/bin/bash
-#
-# Streamer Viewer USB Handler Script
-# Automatically launched by udev when USB devices are inserted
-#
 
-# Logging
-LOG_FILE="/var/log/streamer-viewer-usb.log"
-exec > >(tee -a "$LOG_FILE") 2>&1
-echo "$(date): USB device event - $ACTION $DEVNAME"
+# RPI Streamer USB Handler
+# Triggered by udev when USB storage device is inserted
 
-# Only handle add events for block devices
-if [ "$ACTION" != "add" ] || [ -z "$DEVNAME" ]; then
-    exit 0
-fi
+DEVICE="$1"
+ACTION="$2"
+USERNAME="$3"
+LOGFILE="/var/log/rpi-streamer-usb.log"
 
-# Brief wait for mount to stabilize (since udev now triggers on mount)
-sleep 2
+# Log function
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOGFILE"
+}
 
-# Get the actual user from environment or fallback
-ACTUAL_USER="${SUDO_USER:-$USER}"
-if [ -z "$ACTUAL_USER" ] || [ "$ACTUAL_USER" = "root" ]; then
-    # Try to find the user from who's logged in
-    ACTUAL_USER=$(who | grep -E "(:0|tty)" | head -n1 | awk '{print $1}')
-fi
-
-if [ -z "$ACTUAL_USER" ]; then
-    echo "$(date): Error - Cannot determine actual user"
-    exit 1
-fi
-
-ACTUAL_HOME="/home/$ACTUAL_USER"
-echo "$(date): Detected user: $ACTUAL_USER"
-
-# Function to check and launch viewer
-check_and_launch() {
-    local mount_point="$1"
-    local streamer_data_dir="$mount_point/streamerData"
+# Function to wait for device to be ready
+wait_for_device() {
+    local device="$1"
+    local timeout=3
+    local count=0
     
-    echo "$(date): Checking mount point: $mount_point"
+    log_message "Waiting for device $device to be ready..."
     
-    if [ ! -d "$streamer_data_dir" ]; then
-        echo "$(date): No streamerData folder found at $mount_point"
+    while [ $count -lt $timeout ]; do
+        # Check if device exists and has a filesystem
+        if [ -b "$device" ] && blkid "$device" >/dev/null 2>&1; then
+            log_message "Device $device is ready"
+            return 0
+        fi
+        sleep 0.5
+        count=$((count + 1))
+        log_message "Waiting for device... ($count/$timeout)"
+    done
+    
+    log_message "Timeout waiting for device $device to be ready"
+    return 1
+}
+
+# Function to safely mount USB device
+mount_usb() {
+    local device="$1"
+    local mount_point="/mnt/rpistreamer"
+    
+    log_message "Attempting to mount $device to $mount_point"
+    
+    # Wait for device to be ready
+    if ! wait_for_device "$device"; then
+        log_message "Device $device is not ready, aborting mount"
         return 1
     fi
     
-    echo "$(date): Found streamerData folder at: $streamer_data_dir"
-    
-    # Check for required subdirectories
-    if [ ! -d "$streamer_data_dir/tracks" ] && [ ! -d "$streamer_data_dir/recordings" ]; then
-        echo "$(date): streamerData folder exists but missing tracks/recordings subdirectories"
-        return 1
-    fi
-    
-    # Desktop path
-    DESKTOP_DIR="$ACTUAL_HOME/Desktop"
-    VIEWER_EXECUTABLE="$DESKTOP_DIR/Viewer-linux"
-    
-    # Ensure Desktop directory exists
-    if [ ! -d "$DESKTOP_DIR" ]; then
-        sudo -u "$ACTUAL_USER" mkdir -p "$DESKTOP_DIR"
-    fi
-    
-    # Check if we need to copy/update the executable
-    USB_EXECUTABLE="$mount_point/Viewer-linux"
-    if [ -f "$USB_EXECUTABLE" ]; then
-        COPY_NEEDED=false
-        
-        if [ ! -f "$VIEWER_EXECUTABLE" ]; then
-            echo "$(date): Viewer executable not found on desktop, copying from USB"
-            COPY_NEEDED=true
+    # Check if mount point is already in use
+    if mountpoint -q "$mount_point"; then
+        # Check if the same device is already mounted
+        local current_device=$(findmnt -n -o SOURCE "$mount_point" 2>/dev/null)
+        if [ "$current_device" = "$device" ]; then
+            log_message "Device $device is already mounted at $mount_point, skipping mount"
+            return 0
         else
-            # Compare modification times or checksums
-            USB_SIZE=$(stat -c%s "$USB_EXECUTABLE" 2>/dev/null || echo "0")
-            DESKTOP_SIZE=$(stat -c%s "$VIEWER_EXECUTABLE" 2>/dev/null || echo "0")
+            log_message "Different device ($current_device) mounted at $mount_point, unmounting"
             
-            if [ "$USB_SIZE" != "$DESKTOP_SIZE" ]; then
-                echo "$(date): Viewer executable size differs, updating from USB"
-                COPY_NEEDED=true
+            # Just log that we're unmounting a different device
+            log_message "Unmounting different device to mount new one"
+            
+            # Try normal unmount first
+            if umount "$mount_point" 2>/dev/null; then
+                log_message "Successfully unmounted $mount_point"
+            elif umount -f "$mount_point" 2>/dev/null; then
+                log_message "Successfully force unmounted $mount_point"
+            elif umount -l "$mount_point" 2>/dev/null; then
+                log_message "Successfully lazy unmounted $mount_point"
             else
-                USB_MTIME=$(stat -c%Y "$USB_EXECUTABLE" 2>/dev/null || echo "0")
-                DESKTOP_MTIME=$(stat -c%Y "$VIEWER_EXECUTABLE" 2>/dev/null || echo "0")
-                
-                if [ "$USB_MTIME" -gt "$DESKTOP_MTIME" ]; then
-                    echo "$(date): USB executable is newer, updating"
-                    COPY_NEEDED=true
-                fi
+                log_message "Failed to unmount $mount_point completely"
+                return 1
             fi
         fi
-        
-        if [ "$COPY_NEEDED" = "true" ]; then
-            echo "$(date): Copying executable to desktop..."
-            cp "$USB_EXECUTABLE" "$VIEWER_EXECUTABLE"
-            chown "$ACTUAL_USER:$ACTUAL_USER" "$VIEWER_EXECUTABLE"
-            chmod +x "$VIEWER_EXECUTABLE"
-            echo "$(date): Executable copied and made executable"
-        fi
+    fi
+    
+    # Create mount point if it doesn't exist
+    mkdir -p "$mount_point"
+    chown "$USERNAME:$USERNAME" "$mount_point"
+    
+    # Detect filesystem type
+    local fs_type=$(blkid -o value -s TYPE "$device" 2>/dev/null)
+    log_message "Detected filesystem type: $fs_type"
+    
+    # Try to mount the device with appropriate filesystem type
+    local mount_cmd
+    if [ -n "$fs_type" ]; then
+        mount_cmd="mount -t $fs_type $device $mount_point"
     else
-        # Check if executable exists on desktop already
-        if [ ! -f "$VIEWER_EXECUTABLE" ]; then
-            echo "$(date): No Viewer-linux found on USB or Desktop"
-            
-            # Send notification to user
-            sudo -u "$ACTUAL_USER" DISPLAY=:0 notify-send \
-                "Streamer Viewer USB" \
-                "Found streamerData but no Viewer-linux executable. Please copy the executable to the USB drive." \
-                --icon=dialog-information \
-                --urgency=normal 2>/dev/null || true
-            
+        mount_cmd="mount $device $mount_point"
+    fi
+    
+    log_message "Mount command: $mount_cmd"
+    
+    if error_output=$($mount_cmd 2>&1); then
+        log_message "Successfully mounted $device to $mount_point"
+        return 0
+    else
+        log_message "Failed to mount $device - Error: $error_output"
+        log_message "Trying fallback mount without fs type"
+        # Fallback: try without specifying filesystem type
+        if error_output2=$(mount "$device" "$mount_point" 2>&1); then
+            log_message "Successfully mounted $device to $mount_point (fallback)"
+            return 0
+        else
+            log_message "Failed to mount $device completely - Error: $error_output2"
             return 1
         fi
     fi
+}
+
+# Function to check for streamerData folder
+check_streamer_data() {
+    local mount_point="/mnt/rpistreamer"
     
-    # Make sure executable has proper permissions
-    chmod +x "$VIEWER_EXECUTABLE"
-    
-    # Check if Streamer Viewer is already running with this data directory
-    if pgrep -f "Streamer-Viewer-Linux.*--data-dir.*$streamer_data_dir" > /dev/null; then
-        echo "$(date): Streamer Viewer already running with this data directory"
+    if [ -d "$mount_point/streamerData" ]; then
+        log_message "streamerData folder found on USB drive"
         return 0
+    else
+        log_message "streamerData folder not found, ignoring this drive"
+        return 1
+    fi
+}
+
+# Function to copy and update Viewer-linux
+copy_viewer() {
+    local mount_point="/mnt/rpistreamer"
+    local desktop_dir="/home/$USERNAME/Desktop"
+    local source_file="$mount_point/Viewer-linux"
+    local dest_file="$desktop_dir/Viewer-linux"
+    
+    if [ ! -f "$source_file" ]; then
+        log_message "Viewer-linux not found on USB drive"
+        return 1
     fi
     
-    echo "$(date): Launching Streamer Viewer with data directory: $streamer_data_dir"
+    # Check if we need to copy (file doesn't exist or is different)
+    if [ ! -f "$dest_file" ] || ! cmp -s "$source_file" "$dest_file"; then
+        log_message "New version detected - killing existing Viewer-linux processes"
+        pkill -f "Viewer-linux" 2>/dev/null || true
+        sleep 1
+        
+        log_message "Copying new version of Viewer-linux to desktop"
+        cp "$source_file" "$dest_file"
+        chmod +x "$dest_file"
+        chown "$USERNAME:$USERNAME" "$dest_file"
+        log_message "Viewer-linux copied and made executable"
+        return 2  # Return 2 to indicate new version was copied
+    else
+        log_message "Viewer-linux is already up to date"
+        return 0  # Return 0 to indicate no update needed
+    fi
+}
+
+# Function to launch the viewer application
+launch_viewer() {
+    local mount_point="/mnt/rpistreamer"
+    local data_dir="$mount_point/streamerData"
+    local desktop_dir="/home/$USERNAME/Desktop"
+    local viewer_executable="$desktop_dir/Viewer-linux"
     
-    # Launch the application as the actual user with full environment
-    sudo -u "$ACTUAL_USER" -H bash -c "
-        export DISPLAY=:0
-        export HOME='$ACTUAL_HOME'
-        export USER='$ACTUAL_USER'
-        export XDG_RUNTIME_DIR='/run/user/$(id -u $ACTUAL_USER)'
-        cd '$ACTUAL_HOME'
-        '$VIEWER_EXECUTABLE' --data-dir '$streamer_data_dir' &
-    " &
+    if [ ! -f "$viewer_executable" ]; then
+        log_message "Viewer-linux executable not found on desktop"
+        return 1
+    fi
     
-    # Send notification to user
-    sudo -u "$ACTUAL_USER" DISPLAY=:0 notify-send \
-        "Streamer Viewer" \
-        "Auto-launched with USB data from: $mount_point" \
-        --icon=dialog-information \
-        --urgency=normal 2>/dev/null || true
+    log_message "Launching Viewer-linux with data-dir=$data_dir"
     
-    echo "$(date): Streamer Viewer launched successfully"
+    # Create a temporary output file to capture launch output
+    local temp_output="/tmp/viewer-launch-$$.log"
+    
+    # Find active desktop session
+    local active_display=""
+    local session_user=""
+    
+    # Try to find active X11 session
+    for display_socket in /tmp/.X11-unix/X*; do
+        if [ -S "$display_socket" ]; then
+            local display_num=":$(basename "$display_socket" | sed 's/X//')"
+            local display_user=$(ps aux | grep "Xorg $display_num" | grep -v grep | awk '{print $1}' | head -1)
+            if [ "$display_user" = "$USERNAME" ]; then
+                active_display="$display_num"
+                session_user="$USERNAME"
+                break
+            fi
+        fi
+    done
+    
+    # If no X11 found, check for Wayland
+    if [ -z "$active_display" ]; then
+        # Check for active Wayland session
+        local wayland_session=$(loginctl list-sessions --no-legend | grep "$USERNAME" | grep "seat0" | awk '{print $1}' | head -1)
+        if [ -n "$wayland_session" ]; then
+            local session_type=$(loginctl show-session "$wayland_session" -p Type --value 2>/dev/null)
+            if [ "$session_type" = "wayland" ]; then
+                active_display="wayland-0"
+                session_user="$USERNAME"
+                log_message "Found wayland session: $wayland_session"
+            elif [ "$session_type" = "x11" ]; then
+                active_display=":0"
+                session_user="$USERNAME"  
+                log_message "Found x11 session: $wayland_session"
+            fi
+        fi
+    fi
+    
+    if [ -z "$active_display" ]; then
+        log_message "No active desktop session found for user $USERNAME"
+        return 1
+    fi
+    
+    log_message "Found active desktop session: $active_display for user $session_user"
+    
+    # Launch application in user session
+    log_message "Launching Viewer application"
+    if [ "$active_display" = "wayland" ]; then
+        sudo -u "$session_user" bash -c "
+            export WAYLAND_DISPLAY='wayland-0'
+            export XDG_RUNTIME_DIR='/run/user/\$(id -u)'
+            export XDG_SESSION_TYPE='wayland'
+            cd '$desktop_dir'
+            nohup '$viewer_executable' --data-dir='$data_dir' >/dev/null 2>&1 &
+            
+            # Wait for web server to start, then open browser
+            for i in {1..5}; do
+                if netstat -tln | grep -q ':5001'; then
+                    firefox http://localhost:5001 >/dev/null 2>&1 &
+                    break
+                fi
+                sleep 2
+            done
+        "
+    else
+        su - "$session_user" -c "
+            export DISPLAY='$active_display'
+            export XDG_RUNTIME_DIR='/run/user/\$(id -u)'
+            export XDG_SESSION_TYPE='x11'
+            export XDG_CURRENT_DESKTOP=KDE
+            export KDE_FULL_SESSION=true
+            export DESKTOP_SESSION=plasma
+            export GDK_BACKEND=x11
+            export QT_QPA_PLATFORM=xcb
+            export XDG_SESSION_CLASS=user
+            export XDG_SESSION_DESKTOP=plasma
+            cd '$desktop_dir'
+            
+            # Launch Viewer application
+            nohup '$viewer_executable' --data-dir='$data_dir' >/dev/null 2>&1 &
+            
+            # Wait for web server to start, then open browser
+            sleep 8
+            for i in {1..5}; do
+                if netstat -tln | grep -q ':5001'; then
+                    firefox http://localhost:5001 >/dev/null 2>&1 &
+                    break
+                fi
+                sleep 2
+            done
+        "
+    fi
+    log_message "Viewer application launched successfully"
+    
+    # Wait a moment for initial output
+    sleep 2
+    
+    # Log any initial output
+    if [ -f "$temp_output" ]; then
+        local output_content=$(cat "$temp_output" 2>/dev/null)
+        if [ -n "$output_content" ]; then
+            log_message "Viewer-linux initial output: $output_content"
+        else
+            log_message "Viewer-linux started with no initial output"
+        fi
+        rm -f "$temp_output"
+    fi
+    
+    # Check if process is running
+    local pid_file="/tmp/viewer-pid-$$"
+    if [ -f "$pid_file" ]; then
+        local viewer_pid=$(cat "$pid_file" 2>/dev/null)
+        rm -f "$pid_file"
+        if [ -n "$viewer_pid" ] && kill -0 "$viewer_pid" 2>/dev/null; then
+            log_message "Viewer-linux launched successfully with PID: $viewer_pid"
+        else
+            log_message "Viewer-linux process not found after launch attempt"
+            return 1
+        fi
+    else
+        log_message "Viewer-linux launched in background"
+    fi
+    
     return 0
 }
 
-# Check all possible mount points
-found_streamer_data=false
-
-# Check if the device is already mounted
-for mount_point in $(mount | grep "^$DEVNAME" | awk '{print $3}'); do
-    if check_and_launch "$mount_point"; then
-        found_streamer_data=true
-        break
-    fi
-done
-
-# If not found in device-specific mounts, search common USB mount locations
-if [ "$found_streamer_data" = "false" ]; then
-    echo "$(date): Device-specific mount not found, searching common USB locations..."
+# Function to handle USB device removal
+handle_removal() {
+    local device="$1"
+    local mount_point="/mnt/rpistreamer"
     
-    # Check standard USB mount locations (any USB drive with streamerData)
-    for base_dir in "/media/$ACTUAL_USER" "/run/media/$ACTUAL_USER" "/media" "/mnt"; do
-        if [ -d "$base_dir" ]; then
-            echo "$(date): Searching in $base_dir"
-            # Look for any subdirectory that contains streamerData
-            for potential_mount in "$base_dir"/*; do
-                if [ -d "$potential_mount" ]; then
-                    echo "$(date): Checking potential mount: $potential_mount"
-                    if [ -d "$potential_mount/streamerData" ]; then
-                        echo "$(date): Found potential streamerData at: $potential_mount"
-                        if check_and_launch "$potential_mount"; then
-                            found_streamer_data=true
-                            break 2  # Break out of both loops
-                        fi
-                    else
-                        echo "$(date): No streamerData folder found at: $potential_mount"
-                    fi
+    log_message "USB device removal detected: $device"
+    
+    # Check if our mount point is mounted
+    if mountpoint -q "$mount_point"; then
+        # Check if the removed device is the one mounted at our mount point
+        local mounted_device=$(findmnt -n -o SOURCE "$mount_point" 2>/dev/null)
+        if [ "$mounted_device" = "$device" ]; then
+            log_message "Removed device $device matches mounted device at $mount_point, unmounting"
+            
+            # Kill any running Viewer-linux processes that might be using the mount
+            pkill -f "Viewer-linux" 2>/dev/null || true
+            sleep 1
+            
+            # Try gentle unmount first, then lazy unmount as fallback
+            if umount "$mount_point" 2>/dev/null; then
+                log_message "Successfully unmounted $mount_point"
+            elif umount -l "$mount_point" 2>/dev/null; then
+                log_message "Successfully lazy unmounted $mount_point"
+            else
+                log_message "Failed to unmount $mount_point - may still be in use"
+            fi
+        else
+            log_message "Removed device $device does not match mounted device $mounted_device, ignoring"
+        fi
+    else
+        log_message "Mount point $mount_point was not mounted, ignoring removal"
+    fi
+}
+
+# Main execution
+# Clear log file at start of each execution
+> "$LOGFILE"
+
+if [ "$ACTION" = "add" ] && [ -n "$DEVICE" ]; then
+    log_message "USB device insertion detected: $DEVICE"
+    
+    # Always kill existing Viewer processes on USB insertion to ensure new data directory is used
+    log_message "Terminating any existing Viewer-linux processes"
+    pkill -f "Viewer-linux" 2>/dev/null || true
+    sleep 2
+    
+    # Try to mount the device
+    if mount_usb "$DEVICE"; then
+        # Check for streamerData folder
+        if check_streamer_data; then
+            # Copy viewer executable and check if new version
+            copy_result=$(copy_viewer)
+            copy_exit_code=$?
+            
+            if [ $copy_exit_code -eq 0 ] || [ $copy_exit_code -eq 2 ]; then
+                # Only launch if no existing viewer is running, or if we just updated
+                if [ $copy_exit_code -eq 2 ] || ! pgrep -f "Viewer-linux.*rpistreamer" >/dev/null; then
+                    # Launch the viewer
+                    launch_viewer
+                else
+                    log_message "Viewer-linux already running with same version, not launching duplicate"
                 fi
-            done
-        fi
-    done
-fi
-
-# If not found in existing mounts, try to mount and check
-if [ "$found_streamer_data" = "false" ]; then
-    # Try to mount the device temporarily
-    TEMP_MOUNT="/tmp/streamer-usb-check-$$"
-    mkdir -p "$TEMP_MOUNT"
-    
-    if mount "$DEVNAME" "$TEMP_MOUNT" 2>/dev/null; then
-        echo "$(date): Temporarily mounted $DEVNAME at $TEMP_MOUNT"
-        
-        if check_and_launch "$TEMP_MOUNT"; then
-            found_streamer_data=true
-        fi
-        
-        # Don't unmount if we found streamerData, let the user handle it
-        if [ "$found_streamer_data" = "false" ]; then
-            umount "$TEMP_MOUNT" 2>/dev/null || true
+            fi
+        else
+            # Unmount if this isn't an RPI Streamer drive
+            umount "/media/$USERNAME/RPISTREAMER" 2>/dev/null || true
         fi
     fi
-    
-    rmdir "$TEMP_MOUNT" 2>/dev/null || true
-fi
-
-if [ "$found_streamer_data" = "false" ]; then
-    echo "$(date): No streamerData folder found on device $DEVNAME"
-fi
-
-echo "$(date): USB handler completed"
-EOF
-
-chmod +x "$HANDLER_SCRIPT"
-echo -e "${GREEN}✓ Created USB handler script: $HANDLER_SCRIPT${NC}"
-
-# Create the udev rule
-echo -e "${BLUE}Creating udev rule...${NC}"
-cat > "$UDEV_RULE_FILE" << EOF
-# Streamer Viewer USB Auto-Launch Rule
-# Triggers when USB storage devices are mounted (not just inserted)
-# 
-# This rule detects when USB filesystems are actually mounted and accessible,
-# eliminating timing issues with mount detection
-
-# Trigger on mount events for USB block devices
-ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_USAGE}=="filesystem", ENV{ID_BUS}=="usb", RUN+="$HANDLER_SCRIPT"
-
-# Alternative: Also trigger on udisks2 mount events
-ACTION=="change", SUBSYSTEM=="block", ENV{ID_FS_USAGE}=="filesystem", ENV{UDISKS_FILESYSTEM_SHARED}=="1", RUN+="$HANDLER_SCRIPT"
-EOF
-
-echo -e "${GREEN}✓ Created udev rule: $UDEV_RULE_FILE${NC}"
-
-# Create desktop entry for manual launch
-echo -e "${BLUE}Creating desktop entry...${NC}"
-cat > "$DESKTOP_ENTRY" << EOF
-[Desktop Entry]
-Name=Streamer Viewer USB
-Comment=Launch Streamer Viewer with USB data directory
-Exec=/usr/local/bin/streamer-viewer-manual-usb-launch.sh
-Icon=media-removable
-Terminal=false
-Type=Application
-Categories=AudioVideo;Video;
-Keywords=GPS;Video;Tracking;USB;
-EOF
-
-# Create manual USB launch script
-MANUAL_LAUNCH_SCRIPT="/usr/local/bin/streamer-viewer-manual-usb-launch.sh"
-cat > "$MANUAL_LAUNCH_SCRIPT" << 'EOF'
-#!/bin/bash
-#
-# Manual USB Launch Script for Streamer Viewer
-# Allows users to manually select USB drives with streamerData
-#
-
-# Find USB drives with streamerData
-USB_DRIVES=()
-while IFS= read -r -d '' mount_point; do
-    if [ -d "$mount_point/streamerData" ]; then
-        USB_DRIVES+=("$mount_point")
-    fi
-done < <(find /media /mnt -maxdepth 3 -name "streamerData" -type d -print0 2>/dev/null)
-
-if [ ${#USB_DRIVES[@]} -eq 0 ]; then
-    zenity --info --text="No USB drives with streamerData folders found." --title="Streamer Viewer USB" 2>/dev/null || \
-    notify-send "Streamer Viewer USB" "No USB drives with streamerData folders found." --icon=dialog-information
-    exit 1
-fi
-
-if [ ${#USB_DRIVES[@]} -eq 1 ]; then
-    SELECTED="${USB_DRIVES[0]}"
+elif [ "$ACTION" = "remove" ]; then
+    handle_removal "$DEVICE"
 else
-    # Multiple drives found, let user choose
-    CHOICE=$(zenity --list --title="Select USB Drive" --text="Multiple USB drives with streamerData found:" --column="USB Drive" "${USB_DRIVES[@]}" 2>/dev/null)
-    if [ -z "$CHOICE" ]; then
-        exit 1
-    fi
-    SELECTED="$CHOICE"
+    log_message "Ignoring event: ACTION=$ACTION, DEVICE=$DEVICE"
 fi
-
-VIEWER_EXECUTABLE="$HOME/Desktop/Viewer-linux"
-if [ ! -f "$VIEWER_EXECUTABLE" ]; then
-    zenity --error --text="Viewer-linux not found on Desktop. Please install it first." --title="Streamer Viewer USB" 2>/dev/null || \
-    notify-send "Streamer Viewer USB" "Viewer-linux not found on Desktop." --icon=dialog-error
-    exit 1
-fi
-
-# Launch with selected USB data directory
-"$VIEWER_EXECUTABLE" --data-dir "$SELECTED/streamerData" &
 EOF
 
-chmod +x "$MANUAL_LAUNCH_SCRIPT"
-echo -e "${GREEN}✓ Created manual launch script: $MANUAL_LAUNCH_SCRIPT${NC}"
+    sudo chmod +x "$USB_HANDLER_SCRIPT"
+    echo "USB handler script created at $USB_HANDLER_SCRIPT"
+}
 
-# Reload udev rules
-echo -e "${BLUE}Reloading udev rules...${NC}"
-udevadm control --reload-rules
-udevadm trigger
-echo -e "${GREEN}✓ udev rules reloaded${NC}"
+# Function to create systemd services
+create_systemd_service() {
+    echo "Creating systemd services..."
+    
+    # Service for USB insertion (add)
+    sudo tee "$SYSTEMD_SERVICE" > /dev/null << EOF
+[Unit]
+Description=RPI Streamer USB Handler for %i (Add)
+DefaultDependencies=false
 
-# Create log file with proper permissions
-touch /var/log/streamer-viewer-usb.log
-chmod 644 /var/log/streamer-viewer-usb.log
-echo -e "${GREEN}✓ Created log file: /var/log/streamer-viewer-usb.log${NC}"
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '$USB_HANDLER_SCRIPT /dev/%i add $USERNAME'
+RemainAfterExit=no
+TimeoutSec=30
+EOF
 
-echo ""
-echo -e "${GREEN}Installation completed successfully!${NC}"
-echo ""
-echo -e "${YELLOW}What was installed:${NC}"
-echo "• udev rule: $UDEV_RULE_FILE"
-echo "• USB handler: $HANDLER_SCRIPT" 
-echo "• Manual launcher: $MANUAL_LAUNCH_SCRIPT"
-echo "• Desktop entry: $DESKTOP_ENTRY"
-echo "• Log file: /var/log/streamer-viewer-usb.log"
-echo ""
-echo -e "${YELLOW}How it works:${NC}"
-echo "1. Insert a USB drive containing a 'streamerData' folder"
-echo "2. The system will automatically detect it"
-echo "3. If 'Streamer-Viewer-Linux' exists on the USB, it will be copied to ~/Desktop"
-echo "4. Streamer Viewer will launch automatically with --data-dir pointing to the USB"
-echo ""
-echo -e "${YELLOW}Manual usage:${NC}"
-echo "• Run 'Streamer Viewer USB' from the applications menu"
-echo "• Or execute: $MANUAL_LAUNCH_SCRIPT"
-echo ""
-echo -e "${YELLOW}Logs and troubleshooting:${NC}"
-echo "• Check logs: tail -f /var/log/streamer-viewer-usb.log"
-echo "• Test udev: sudo udevadm test /sys/block/sdX (replace X with your USB device)"
-echo ""
-echo -e "${BLUE}Ready! Insert a USB drive with streamerData to test.${NC}"
+    # Service for USB removal (remove)
+    sudo tee "$SYSTEMD_REMOVAL_SERVICE" > /dev/null << EOF
+[Unit]
+Description=RPI Streamer USB Handler for %i (Remove)
+DefaultDependencies=false
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '$USB_HANDLER_SCRIPT /dev/%i remove $USERNAME'
+RemainAfterExit=no
+TimeoutSec=10
+EOF
+
+    # Reload systemd
+    sudo systemctl daemon-reload
+    echo "Systemd services created:"
+    echo "  - Add service: $SYSTEMD_SERVICE"
+    echo "  - Remove service: $SYSTEMD_REMOVAL_SERVICE"
+}
+
+# Function to create udev rule
+create_udev_rule() {
+    echo "Creating udev rule..."
+    
+    sudo tee "$UDEV_RULE_FILE" > /dev/null << EOF
+# RPI Streamer USB Autolaunch Rule  
+# Triggers systemd services when USB storage devices are inserted or removed
+
+# Match USB storage devices partitions and trigger systemd service for ADD events
+SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_FS_USAGE}=="filesystem", ACTION=="add", TAG+="systemd", ENV{SYSTEMD_WANTS}="rpi-streamer-usb@%k.service"
+
+# Match USB storage devices partitions and trigger systemd service for REMOVE events  
+SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ACTION=="remove", RUN+="/bin/systemctl start rpi-streamer-usb-remove@%k.service"
+EOF
+
+    echo "Udev rule created at $UDEV_RULE_FILE"
+}
+
+# Function to reload udev rules
+reload_udev() {
+    echo "Reloading udev rules..."
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger
+    echo "Udev rules reloaded"
+}
+
+# Function to create log file and set permissions
+setup_logging() {
+    echo "Setting up logging..."
+    sudo touch /var/log/rpi-streamer-usb.log
+    sudo chmod 666 /var/log/rpi-streamer-usb.log
+    echo "Log file created at /var/log/rpi-streamer-usb.log"
+}
+
+# Function to create desktop directory if it doesn't exist
+setup_desktop() {
+    echo "Setting up desktop directory..."
+    mkdir -p "$DESKTOP_DIR"
+    echo "Desktop directory ready: $DESKTOP_DIR"
+}
+
+# Main installation process
+main() {
+    echo "Starting installation..."
+    
+    # Create necessary directories and setup
+    setup_desktop
+    setup_logging
+    
+    # Create the USB handler script
+    create_usb_handler
+    
+    # Create the systemd service
+    create_systemd_service
+    
+    # Create the udev rule
+    create_udev_rule
+    
+    # Reload udev rules
+    reload_udev
+    
+    echo
+    echo "=== Installation Complete ==="
+    echo "The USB autolaunch system is now installed and active."
+    echo
+    echo "What happens when you insert a USB drive:"
+    echo "1. System detects USB insertion"
+    echo "2. Mounts drive to: $MOUNT_POINT"
+    echo "3. Checks for 'streamerData' folder"
+    echo "4. If found, copies 'Viewer-linux' to desktop (if different)"
+    echo "5. Launches: Viewer-linux --data-dir=$MOUNT_POINT/streamerData"
+    echo
+    echo "Log file location: /var/log/rpi-streamer-usb.log"
+    echo "To monitor activity: tail -f /var/log/rpi-streamer-usb.log"
+    echo
+    echo "To uninstall, run: $SCRIPT_DIR/uninstall_usb_autolaunch.sh"
+}
+
+# Run main installation
+main

@@ -1,11 +1,8 @@
 #!/bin/bash
-#
-# Streamer Viewer USB Auto-Launch Uninstaller for Linux
-# 
+
+# RPI Streamer USB Auto-Launch Uninstaller for Linux
 # This script removes the udev rule and scripts installed by install_usb_autolaunch.sh
-#
 # Usage: sudo ./uninstall_usb_autolaunch.sh
-#
 
 set -e
 
@@ -17,14 +14,14 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration - must match install script
-UDEV_RULE_FILE="/etc/udev/rules.d/99-streamer-viewer-usb.rules"
-HANDLER_SCRIPT="/usr/local/bin/streamer-viewer-usb-handler.sh"
-DESKTOP_ENTRY="/usr/share/applications/streamer-viewer-usb.desktop"
-MANUAL_LAUNCH_SCRIPT="/usr/local/bin/streamer-viewer-manual-usb-launch.sh"
-LOG_FILE="/var/log/streamer-viewer-usb.log"
+UDEV_RULE_FILE="/etc/udev/rules.d/99-rpi-streamer-usb.rules"
+HANDLER_SCRIPT="/usr/local/bin/rpi-streamer-usb-handler.sh"
+SYSTEMD_SERVICE="/etc/systemd/system/rpi-streamer-usb@.service"
+SYSTEMD_REMOVAL_SERVICE="/etc/systemd/system/rpi-streamer-usb-remove@.service"
+LOG_FILE="/var/log/rpi-streamer-usb.log"
 
-echo -e "${BLUE}Streamer Viewer USB Auto-Launch Uninstaller${NC}"
-echo -e "${BLUE}===========================================${NC}"
+echo -e "${BLUE}RPI Streamer USB Auto-Launch Uninstaller${NC}"
+echo -e "${BLUE}=======================================${NC}"
 echo ""
 
 # Check if running as root
@@ -34,7 +31,7 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-echo -e "${YELLOW}Removing Streamer Viewer USB auto-launch components...${NC}"
+echo -e "${YELLOW}Removing RPI Streamer USB auto-launch components...${NC}"
 echo ""
 
 # Remove udev rule
@@ -53,21 +50,25 @@ else
     echo -e "${YELLOW}• Handler script not found: $HANDLER_SCRIPT${NC}"
 fi
 
-# Remove manual launch script
-if [ -f "$MANUAL_LAUNCH_SCRIPT" ]; then
-    rm -f "$MANUAL_LAUNCH_SCRIPT"
-    echo -e "${GREEN}✓ Removed manual launch script: $MANUAL_LAUNCH_SCRIPT${NC}"
+# Remove systemd services
+if [ -f "$SYSTEMD_SERVICE" ]; then
+    systemctl stop "rpi-streamer-usb@*.service" 2>/dev/null || true
+    rm -f "$SYSTEMD_SERVICE"
+    echo -e "${GREEN}✓ Removed systemd add service: $SYSTEMD_SERVICE${NC}"
 else
-    echo -e "${YELLOW}• Manual launch script not found: $MANUAL_LAUNCH_SCRIPT${NC}"
+    echo -e "${YELLOW}• Systemd add service not found: $SYSTEMD_SERVICE${NC}"
 fi
 
-# Remove desktop entry
-if [ -f "$DESKTOP_ENTRY" ]; then
-    rm -f "$DESKTOP_ENTRY"
-    echo -e "${GREEN}✓ Removed desktop entry: $DESKTOP_ENTRY${NC}"
+if [ -f "$SYSTEMD_REMOVAL_SERVICE" ]; then
+    systemctl stop "rpi-streamer-usb-remove@*.service" 2>/dev/null || true
+    rm -f "$SYSTEMD_REMOVAL_SERVICE"
+    echo -e "${GREEN}✓ Removed systemd remove service: $SYSTEMD_REMOVAL_SERVICE${NC}"
 else
-    echo -e "${YELLOW}• Desktop entry not found: $DESKTOP_ENTRY${NC}"
+    echo -e "${YELLOW}• Systemd remove service not found: $SYSTEMD_REMOVAL_SERVICE${NC}"
 fi
+
+# Reload systemd after removing services
+systemctl daemon-reload
 
 # Ask about log file
 if [ -f "$LOG_FILE" ]; then
@@ -93,5 +94,5 @@ echo -e "${GREEN}✓ udev rules reloaded${NC}"
 echo ""
 echo -e "${GREEN}Uninstallation completed successfully!${NC}"
 echo ""
-echo -e "${YELLOW}Note:${NC} The Streamer-Viewer-Linux executable on user desktops was not removed."
-echo "Users can manually delete ~/Desktop/Streamer-Viewer-Linux if desired."
+echo -e "${YELLOW}Note:${NC} The Viewer-linux executable on user desktops was not removed."
+echo "Users can manually delete ~/Desktop/Viewer-linux if desired."
