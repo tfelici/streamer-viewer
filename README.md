@@ -80,14 +80,14 @@ Streamer Viewer/
 ├── .github/
 │   └── workflows/                   # Automated build system
 │       ├── build-windows.yml        # Windows executable build
-│       ├── build-macos.yml          # macOS app bundle build
-│       └── build-linux-webview.yml  # Linux executable build
+│       └── build-macos.yml          # macOS app bundle build
 ├── streamerData/                    # Data directory
 │   ├── tracks/                      # GPS track files (*.tsv)
 │   └── recordings/
 │       └── webcam/                  # Video files (*.mp4)
-├── linux/                          # Linux deployment scripts
-│   └── install_usb_autolaunch.sh   # USB autolaunch setup
+├── linux/                          # Linux USB autolaunch scripts
+│   ├── install_usb_autolaunch.sh   # USB autolaunch setup
+│   └── uninstall_usb_autolaunch.sh # USB autolaunch removal
 └── StreamerViewer.spec             # PyInstaller spec for all platforms
 ```
 
@@ -127,7 +127,7 @@ python main.py --data-dir "/home/user/streamer_data"
 Download pre-built executables from GitHub Actions artifacts or releases:
 - **Windows**: `StreamerViewer-windows.exe`
 - **macOS**: `StreamerViewer-macos-x86_64` / `StreamerViewer-macos-arm64`
-- **Linux**: `Viewer-linux-webview` (requires Qt5 libraries)
+- **Linux**: Run directly with Python (see Linux Installation below)
 
 ### 🧭 Navigation
 
@@ -148,22 +148,40 @@ Executables are automatically built using GitHub Actions workflows:
 ### 📦 Automated Builds
 - **Windows**: `.github/workflows/build-windows.yml` → `StreamerViewer-windows.exe`
 - **macOS**: `.github/workflows/build-macos.yml` → `StreamerViewer-macos-x86_64` / `StreamerViewer-macos-arm64`
-- **Linux**: `.github/workflows/build-linux-webview.yml` → `Viewer-linux-webview`
 
 ### 🔧 Manual Build
 ```bash
-# Build for current platform
+# Build for current platform (Windows/macOS)
 pyinstaller StreamerViewer.spec
 ```
 
 The executable will be created in `dist/StreamerViewer`
 
-For Linux with webview support:
+### 🐧 Linux Installation
+For Linux systems, run directly with Python:
+
 ```bash
-# Use the specialized Linux webview build
-pyinstaller StreamerViewer-linux-webview.spec
+# Clone the repository
+git clone https://github.com/tfelici/streamer-viewer.git
+cd streamer-viewer
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Run the application
+python main.py
 ```
-Creates `dist/Viewer-linux`
+
+**Optional webview support** (for native window instead of browser):
+```bash
+# Install system Qt5 libraries (Ubuntu/Debian)
+sudo apt install qtbase5-dev libqt5webenginewidgets5
+
+# Install Python webview with Qt backend
+pip install pywebview[qt]
+```
+
+If webview is not available, the application automatically falls back to your default browser.
 
 ## Dependencies
 
