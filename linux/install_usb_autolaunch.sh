@@ -209,11 +209,16 @@ if [ "$found_streamer_data" = "false" ]; then
             echo "$(date): Searching in $base_dir"
             # Look for any subdirectory that contains streamerData
             for potential_mount in "$base_dir"/*; do
-                if [ -d "$potential_mount" ] && [ -d "$potential_mount/streamerData" ]; then
-                    echo "$(date): Found potential streamerData at: $potential_mount"
-                    if check_and_launch "$potential_mount"; then
-                        found_streamer_data=true
-                        break 2  # Break out of both loops
+                if [ -d "$potential_mount" ]; then
+                    echo "$(date): Checking potential mount: $potential_mount"
+                    if [ -d "$potential_mount/streamerData" ]; then
+                        echo "$(date): Found potential streamerData at: $potential_mount"
+                        if check_and_launch "$potential_mount"; then
+                            found_streamer_data=true
+                            break 2  # Break out of both loops
+                        fi
+                    else
+                        echo "$(date): No streamerData folder found at: $potential_mount"
                     fi
                 fi
             done
