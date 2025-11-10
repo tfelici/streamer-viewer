@@ -106,7 +106,7 @@ check_and_launch() {
     
     # Desktop path
     DESKTOP_DIR="$ACTUAL_HOME/Desktop"
-    VIEWER_EXECUTABLE="$DESKTOP_DIR/Streamer-Viewer-Linux"
+    VIEWER_EXECUTABLE="$DESKTOP_DIR/Viewer-linux"
     
     # Ensure Desktop directory exists
     if [ ! -d "$DESKTOP_DIR" ]; then
@@ -114,7 +114,7 @@ check_and_launch() {
     fi
     
     # Check if we need to copy/update the executable
-    USB_EXECUTABLE="$mount_point/Streamer-Viewer-Linux"
+    USB_EXECUTABLE="$mount_point/Viewer-linux"
     if [ -f "$USB_EXECUTABLE" ]; then
         COPY_NEEDED=false
         
@@ -150,12 +150,12 @@ check_and_launch() {
     else
         # Check if executable exists on desktop already
         if [ ! -f "$VIEWER_EXECUTABLE" ]; then
-            echo "$(date): No Streamer-Viewer-Linux found on USB or Desktop"
+            echo "$(date): No Viewer-linux found on USB or Desktop"
             
             # Send notification to user
             sudo -u "$ACTUAL_USER" DISPLAY=:0 notify-send \
                 "Streamer Viewer USB" \
-                "Found streamerData but no Streamer-Viewer-Linux executable. Please copy the executable to the USB drive." \
+                "Found streamerData but no Viewer-linux executable. Please copy the executable to the USB drive." \
                 --icon=dialog-information \
                 --urgency=normal 2>/dev/null || true
             
@@ -294,10 +294,10 @@ else
     SELECTED="$CHOICE"
 fi
 
-VIEWER_EXECUTABLE="$HOME/Desktop/Streamer-Viewer-Linux"
+VIEWER_EXECUTABLE="$HOME/Desktop/Viewer-linux"
 if [ ! -f "$VIEWER_EXECUTABLE" ]; then
-    zenity --error --text="Streamer-Viewer-Linux not found on Desktop. Please install it first." --title="Streamer Viewer USB" 2>/dev/null || \
-    notify-send "Streamer Viewer USB" "Streamer-Viewer-Linux not found on Desktop." --icon=dialog-error
+    zenity --error --text="Viewer-linux not found on Desktop. Please install it first." --title="Streamer Viewer USB" 2>/dev/null || \
+    notify-send "Streamer Viewer USB" "Viewer-linux not found on Desktop." --icon=dialog-error
     exit 1
 fi
 

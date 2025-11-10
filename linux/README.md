@@ -18,14 +18,14 @@ The USB auto-launch system consists of:
 Before setting up USB auto-launch, you need the Linux executable:
 
 **Download Options:**
-- 🔗 **[Latest Release](https://github.com/tfelici/streamer-viewer/releases/latest)** - Download `Streamer-Viewer-Linux` from GitHub Releases
+- 🔗 **[Latest Release](https://github.com/tfelici/streamer-viewer/releases/latest)** - Download `Viewer-linux` from GitHub Releases
 - 📦 **[All Releases](https://github.com/tfelici/streamer-viewer/releases)** - Browse all versions
 
 **Setup:**
-1. Download the `Streamer-Viewer-Linux` executable
+1. Download the `Viewer-linux` executable
 2. Place it on your USB drive alongside the `streamerData` folder, OR
-3. Copy it to `~/Desktop/Streamer-Viewer-Linux` manually
-4. Make executable: `chmod +x Streamer-Viewer-Linux`
+3. Copy it to `~/Desktop/Viewer-linux` manually
+4. Make executable: `chmod +x Viewer-linux`
 
 The USB auto-launch system will automatically copy/update the executable from USB to desktop when needed.
 
@@ -77,7 +77,7 @@ sudo ./install_usb_autolaunch.sh
    │   ├── tracks/          # GPS track files (.tsv)
    │   └── recordings/      # Video files
    │       └── webcam/
-   └── Streamer-Viewer-Linux  # (optional) Executable
+   └── Viewer-linux  # (optional) Executable
    ```
 
 2. **Insert USB Drive**: System automatically detects and launches Streamer Viewer
@@ -111,6 +111,71 @@ sudo tail -f /var/log/streamer-viewer-usb.log
 
 # View recent activity
 sudo tail -50 /var/log/streamer-viewer-usb.log
+```
+
+### Debug USB Auto-Launch Issues
+
+**Step 1: Verify Installation**
+```bash
+# Check if udev rule exists
+ls -la /etc/udev/rules.d/99-streamer-viewer-usb.rules
+
+# Check if handler script exists
+ls -la /usr/local/bin/streamer-viewer-usb-handler.sh
+
+# Check if log file exists
+ls -la /var/log/streamer-viewer-usb.log
+```
+
+**Step 2: Check udev Rule Status**
+```bash
+# Test if udev rules are loaded
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# Check udev rule syntax
+sudo udevadm test-builtin path_id /sys/block/sda  # Replace sda with your USB device
+```
+
+**Step 3: Monitor USB Events**
+```bash
+# Watch udev events in real-time (run this, then insert USB)
+sudo udevadm monitor --property --subsystem-match=block
+
+# Alternative: monitor all USB events
+sudo udevadm monitor --kernel --udev --property
+```
+
+**Step 4: Manual USB Device Testing**
+```bash
+# Find your USB device
+lsblk
+sudo fdisk -l
+
+# Check if your USB has the expected structure
+mount | grep /media
+ls -la /media/$USER/*/  # Check mounted USB drives
+ls -la /media/$USER/*/streamerData/  # Look for streamerData folder
+```
+
+**Step 5: Test Handler Script Manually**
+```bash
+# Set environment variables and test handler directly
+export ACTION="add"
+export DEVNAME="/dev/sdb1"  # Replace with your USB device
+sudo -E /usr/local/bin/streamer-viewer-usb-handler.sh
+```
+
+**Step 6: KDE Neon Specific Checks**
+```bash
+# Check if udisks2 is managing USB mounts (common in KDE)
+systemctl status udisks2
+
+# Check KDE's device notifier settings
+# Go to System Settings → Hardware → Removable Storage
+
+# Verify user is in plugdev group (needed for some USB operations)
+groups $USER
 ```
 
 ### Test USB Detection
@@ -181,7 +246,7 @@ USB_Drive/
 │               └── 12345678/
 │                   ├── 1634567890.mp4
 │                   └── 1634567891.mp4
-└── Streamer-Viewer-Linux     # Auto-copied to Desktop
+└── Viewer-linux     # Auto-copied to Desktop
 ```
 
 ## ⚙️ Configuration
@@ -236,6 +301,29 @@ sudo ./uninstall_usb_autolaunch.sh
 - Check if device is properly mounted: `mount | grep /media`
 - Verify udev rules are active: `sudo udevadm control --reload-rules`
 - Check logs for errors: `sudo tail /var/log/streamer-viewer-usb.log`
+
+### KDE Neon / Plasma Specific Issues
+- **Device Notifier Conflict**: KDE's device notifier may interfere
+  ```bash
+  # Disable KDE's auto-actions temporarily
+  # System Settings → Hardware → Removable Storage → uncheck auto-actions
+  ```
+- **udisks2 Integration**: KDE uses udisks2 for USB management
+  ```bash
+  # Check udisks2 service
+  systemctl status udisks2
+  
+  # Monitor udisks2 events
+  udisksctl monitor
+  ```
+- **Polkit Permissions**: Check if polkit is blocking udev actions
+  ```bash
+  # Check polkit rules
+  sudo ls -la /etc/polkit-1/rules.d/
+  
+  # Add user to plugdev group if needed
+  sudo usermod -a -G plugdev $USER
+  ```
 
 ### Executable Not Copying
 - Verify executable exists on USB and has correct name
