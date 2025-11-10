@@ -51,28 +51,22 @@ jobs:
           python3-gi-cairo \
           libwebkit2gtk-4.1-0
         
-        # Additional GUI dependencies
+        # Additional GUI runtime dependencies (minimal set for webview)
         sudo apt-get install -y \
-          libegl1-mesa \
           libxkbcommon-x11-0 \
           libxcb-xinerama0 \
-          libxcb-cursor0 \
           libxss1 \
-          libasound2 \
-          libgconf-2-4 \
           libxrandr2 \
           libatk1.0-0 \
-          libgtk-3-0 \
           libgdk-pixbuf2.0-0 \
           libdrm2 \
           libxcomposite1 \
           libxdamage1 \
           libxfixes3 \
-          libxss1 \
           libglib2.0-0 \
           libnss3 \
           libxrender1 \
-          libx11-xcb1
+          libx11-xcb1 || true
     
     - name: Install Python dependencies
       run: |

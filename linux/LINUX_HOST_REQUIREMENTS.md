@@ -73,13 +73,13 @@ The Streamer Viewer executable requires either Qt or GTK libraries to display th
 Some additional libraries that may be needed:
 ```bash
 # Graphics and display
-sudo apt install libegl1-mesa libxkbcommon-x11-0 libxcb-xinerama0
+sudo apt install libegl1 libxkbcommon-x11-0 libxcb-xinerama0
 
 # Audio (if needed)
-sudo apt install libasound2
+sudo apt install libasound2-dev
 
 # Common desktop libraries  
-sudo apt install libxss1 libgconf-2-4 libxrandr2 libatk1.0-0
+sudo apt install libxss1 libxrandr2 libatk1.0-0
 ```
 
 ## Testing Installation
