@@ -24,12 +24,10 @@ jobs:
       run: |
         sudo apt-get update
         
-        # Qt5 system libraries (for PyQt5)
+        # Qt5 system libraries (for PyQt5) - Updated for Ubuntu 22.04+
         sudo apt-get install -y \
-          qt5-default \
           qtbase5-dev \
           qtwebengine5-dev \
-          libqt5webkit5-dev \
           libqt5webenginewidgets5 \
           libqt5webenginecore5 \
           libqt5webengine5 \
@@ -38,7 +36,9 @@ jobs:
           libqt5core5a \
           libqt5widgets5 \
           libqt5network5 \
-          libqt5printsupport5
+          libqt5printsupport5 \
+          qt5-qmake \
+          qtbase5-dev-tools
         
         # GTK3 system libraries (fallback)
         sudo apt-get install -y \
@@ -263,7 +263,7 @@ jobs:
         echo "" >> build-info.md
         echo "**For KDE/Qt-based desktops:**" >> build-info.md
         echo "\`\`\`bash" >> build-info.md
-        echo "sudo apt install qt5-default libqt5webenginewidgets5" >> build-info.md
+        echo "sudo apt install qtbase5-dev libqt5webenginewidgets5" >> build-info.md
         echo "\`\`\`" >> build-info.md
         echo "" >> build-info.md
         echo "**For GNOME/GTK-based desktops:**" >> build-info.md
@@ -273,7 +273,7 @@ jobs:
         echo "" >> build-info.md
         echo "**Universal (works on most systems):**" >> build-info.md
         echo "\`\`\`bash" >> build-info.md
-        echo "sudo apt install qt5-default libgtk-3-0 libwebkit2gtk-4.0-37" >> build-info.md
+        echo "sudo apt install qtbase5-dev libqt5webenginewidgets5 libgtk-3-0 libwebkit2gtk-4.0-37" >> build-info.md
         echo "\`\`\`" >> build-info.md
         
         cat build-info.md

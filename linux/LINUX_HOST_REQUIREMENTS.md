@@ -9,7 +9,7 @@ This document outlines the system requirements and installation steps needed on 
 #### KDE/Qt-based desktops (recommended):
 ```bash
 sudo apt update
-sudo apt install qt5-default libqt5webenginewidgets5 libqt5webenginecore5 libqt5gui5
+sudo apt install qtbase5-dev libqt5webenginewidgets5 libqt5webenginecore5 libqt5gui5
 ```
 
 #### GNOME/GTK-based desktops:
@@ -21,7 +21,7 @@ sudo apt install libgtk-3-0 libwebkit2gtk-4.0-37 gir1.2-webkit2-4.0
 #### Universal installation (works on most desktops):
 ```bash
 sudo apt update
-sudo apt install qt5-default libqt5webenginewidgets5 libgtk-3-0 libwebkit2gtk-4.0-37
+sudo apt install qtbase5-dev libqt5webenginewidgets5 libgtk-3-0 libwebkit2gtk-4.0-37
 ```
 
 ### For Red Hat/Fedora/CentOS systems:
@@ -55,7 +55,7 @@ sudo pacman -S gtk3 webkit2gtk
 The Streamer Viewer executable requires either Qt or GTK libraries to display the webview interface:
 
 **Qt5 Libraries (preferred for KDE):**
-- `qt5-default` or `qt5-qtbase`
+- `qtbase5-dev` or `qt5-qtbase` (replaces deprecated `qt5-default`)
 - `libqt5webenginewidgets5` or `qt5-qtwebengine`
 - `libqt5webenginecore5`
 - `libqt5gui5`
@@ -162,7 +162,7 @@ sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0
 
 **"Cannot find Qt platform plugin"**
 ```bash
-sudo apt install qt5-default libqt5gui5
+sudo apt install qtbase5-dev libqt5gui5 qt5-qmake
 export QT_QPA_PLATFORM=xcb  # Add to ~/.bashrc if needed
 ```
 
