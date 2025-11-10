@@ -216,12 +216,13 @@ ps aux | grep -i streamer
 
 ### Detection Flow
 1. **USB Insertion** → udev detects block device
-2. **Handler Script** → checks for filesystem
-3. **Mount Check** → looks for existing mounts
-4. **Temporary Mount** → mounts device if needed
-5. **Folder Check** → searches for `streamerData/`
-6. **Executable Management** → copies/updates if needed
-7. **Launch** → starts Streamer Viewer with `--data-dir`
+2. **Mounting Wait** → waits 3 seconds for KDE/udisks2 to mount
+3. **Mount Check** → looks for device-specific mounts first
+4. **Broad Search** → searches `/media/USER/*/`, `/run/media/USER/*/`, etc.
+5. **Folder Check** → searches for `streamerData/` in any mounted USB
+6. **Temporary Mount** → mounts device if still not found
+7. **Executable Management** → copies/updates if needed
+8. **Launch** → starts Streamer Viewer with `--data-dir`
 
 ### Security Features
 - Runs as actual user (not root)
@@ -319,6 +320,8 @@ sudo ./uninstall_usb_autolaunch.sh
 - Check if device is properly mounted: `mount | grep /media`
 - Verify udev rules are active: `sudo udevadm control --reload-rules`
 - Check logs for errors: `sudo tail /var/log/streamer-viewer-usb.log`
+- **USB Drive Names**: System searches any USB with `streamerData/` regardless of drive label (KINGSTON, USB_DRIVE, etc.)
+- **Manual Check**: Look for your USB: `find /media /run/media -name "streamerData" -type d 2>/dev/null`
 
 ### KDE Neon / Plasma Specific Issues
 - **Device Notifier Conflict**: KDE's device notifier may interfere

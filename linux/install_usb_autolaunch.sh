@@ -66,8 +66,8 @@ if [ "$ACTION" != "add" ] || [ -z "$DEVNAME" ]; then
     exit 0
 fi
 
-# Wait a moment for the device to be fully mounted
-sleep 2
+# Wait a moment for the device to be fully mounted by KDE/udisks2
+sleep 3
 
 # Get the actual user from environment or fallback
 ACTUAL_USER="${SUDO_USER:-$USER}"
@@ -198,6 +198,28 @@ for mount_point in $(mount | grep "^$DEVNAME" | awk '{print $3}'); do
         break
     fi
 done
+
+# If not found in device-specific mounts, search common USB mount locations
+if [ "$found_streamer_data" = "false" ]; then
+    echo "$(date): Device-specific mount not found, searching common USB locations..."
+    
+    # Check standard USB mount locations (any USB drive with streamerData)
+    for base_dir in "/media/$ACTUAL_USER" "/run/media/$ACTUAL_USER" "/media" "/mnt"; do
+        if [ -d "$base_dir" ]; then
+            echo "$(date): Searching in $base_dir"
+            # Look for any subdirectory that contains streamerData
+            for potential_mount in "$base_dir"/*; do
+                if [ -d "$potential_mount" ] && [ -d "$potential_mount/streamerData" ]; then
+                    echo "$(date): Found potential streamerData at: $potential_mount"
+                    if check_and_launch "$potential_mount"; then
+                        found_streamer_data=true
+                        break 2  # Break out of both loops
+                    fi
+                fi
+            done
+        fi
+    done
+fi
 
 # If not found in existing mounts, try to mount and check
 if [ "$found_streamer_data" = "false" ]; then
