@@ -256,10 +256,10 @@ launch_viewer() {
             cd '$desktop_dir'
             nohup '$viewer_executable' --data-dir='$data_dir' >/dev/null 2>&1 &
             
-            # Wait for web server to start, then open browser
+            # Wait for web server to start, then open browser in kiosk mode
             for i in {1..5}; do
                 if netstat -tln | grep -q ':5001'; then
-                    firefox http://localhost:5001 >/dev/null 2>&1 &
+                    firefox --kiosk http://localhost:5001 >/dev/null 2>&1 &
                     break
                 fi
                 sleep 2
@@ -282,11 +282,10 @@ launch_viewer() {
             # Launch Viewer application
             nohup '$viewer_executable' --data-dir='$data_dir' >/dev/null 2>&1 &
             
-            # Wait for web server to start, then open browser
-            sleep 8
+            # Wait for web server to start, then open browser in kiosk mode
             for i in {1..5}; do
                 if netstat -tln | grep -q ':5001'; then
-                    firefox http://localhost:5001 >/dev/null 2>&1 &
+                    firefox --kiosk http://localhost:5001 >/dev/null 2>&1 &
                     break
                 fi
                 sleep 2
@@ -343,6 +342,10 @@ handle_removal() {
             
             # Kill any running Viewer-linux processes that might be using the mount
             pkill -f "Viewer-linux" 2>/dev/null || true
+            
+            # Kill Firefox browser processes (kiosk mode)
+            pkill -f "firefox.*localhost:5001" 2>/dev/null || true
+            pkill firefox 2>/dev/null || true
             sleep 1
             
             # Try gentle unmount first, then lazy unmount as fallback
