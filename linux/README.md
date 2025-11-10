@@ -31,19 +31,29 @@ The USB auto-launch system will automatically copy/update the executable from US
 
 ## 📥 Quick Download
 
+> **💡 Cache Note:** GitHub caches raw files for up to 5 minutes. For the latest version, use the cache-busted commands below or wait a few minutes after updates.
+
 **Installation Scripts:**
-- 🔗 **[install_usb_autolaunch.sh](https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh)** - Right-click → Save As
-- 🔗 **[uninstall_usb_autolaunch.sh](https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh)** - Right-click → Save As
+- 🔗 **[install_usb_autolaunch.sh](https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?v=2025-11-10)** - Right-click → Save As
+- 🔗 **[uninstall_usb_autolaunch.sh](https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh?v=2025-11-10)** - Right-click → Save As
 
 **Quick Installation:**
 ```bash
-# Using curl
-curl -O https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh
+# Using curl (cache-busted)
+TIMESTAMP=$(date +%s)
+curl -O "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?v=$TIMESTAMP"
+mv "install_usb_autolaunch.sh?v=$TIMESTAMP" install_usb_autolaunch.sh
 chmod +x install_usb_autolaunch.sh
 sudo ./install_usb_autolaunch.sh
 
-# Or using wget
-wget https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh
+# Or using wget (cache-busted)  
+TIMESTAMP=$(date +%s)
+wget -O install_usb_autolaunch.sh "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?v=$TIMESTAMP"
+chmod +x install_usb_autolaunch.sh
+sudo ./install_usb_autolaunch.sh
+
+# Simple version (may use cached file)
+curl -O https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh
 chmod +x install_usb_autolaunch.sh
 sudo ./install_usb_autolaunch.sh
 ```
@@ -275,13 +285,21 @@ USB_EXECUTABLE="$mount_point/Your-Custom-Executable-Name"
 
 **Quick Uninstall:**
 ```bash
-# Download and run uninstaller
-curl -O https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh
+# Download and run uninstaller (cache-busted)
+TIMESTAMP=$(date +%s)
+curl -O "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh?v=$TIMESTAMP"
+mv "uninstall_usb_autolaunch.sh?v=$TIMESTAMP" uninstall_usb_autolaunch.sh
 chmod +x uninstall_usb_autolaunch.sh
 sudo ./uninstall_usb_autolaunch.sh
 
-# Or using wget
-wget https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh
+# Or using wget (cache-busted)
+TIMESTAMP=$(date +%s)
+wget -O uninstall_usb_autolaunch.sh "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh?v=$TIMESTAMP"
+chmod +x uninstall_usb_autolaunch.sh
+sudo ./uninstall_usb_autolaunch.sh
+
+# Simple version (may use cached file)
+curl -O https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh
 chmod +x uninstall_usb_autolaunch.sh
 sudo ./uninstall_usb_autolaunch.sh
 ```
