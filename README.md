@@ -77,16 +77,18 @@ Streamer Viewer/
 │   └── webfonts/                    # Font files
 │       ├── fa-solid-900.woff2       # Web font (optimized)
 │       └── fa-solid-900.ttf         # Fallback font
+├── .github/
+│   └── workflows/                   # Automated build system
+│       ├── build-windows.yml        # Windows executable build
+│       ├── build-macos.yml          # macOS app bundle build
+│       └── build-linux-webview.yml  # Linux executable build
 ├── streamerData/                    # Data directory
 │   ├── tracks/                      # GPS track files (*.tsv)
 │   └── recordings/
 │       └── webcam/                  # Video files (*.mp4)
-└── windows/                         # Build system
-    ├── build_standalone.bat         # Build script
-    ├── StreamerViewer_onefile.spec  # PyInstaller spec
-    ├── version_info.txt             # Version metadata
-    └── dist/
-        └── StreamerViewer.exe       # Final executable
+├── linux/                          # Linux deployment scripts
+│   └── install_usb_autolaunch.sh   # USB autolaunch setup
+└── StreamerViewer.spec             # PyInstaller spec for all platforms
 ```
 
 ## Data Sources
@@ -121,12 +123,11 @@ python main.py --data-dir "/home/user/streamer_data"
 **Command Line Options:**
 - `--data-dir PATH` - Specify custom path to streamer data directory (default: `./streamerData`)
 
-**Standalone Executable:**
-```bash
-cd windows
-build_standalone.bat
-```
-Creates `windows/dist/StreamerViewer.exe`
+**Standalone Executables:**
+Download pre-built executables from GitHub Actions artifacts or releases:
+- **Windows**: `StreamerViewer-windows.exe`
+- **macOS**: `StreamerViewer-macos-x86_64` / `StreamerViewer-macos-arm64`
+- **Linux**: `Viewer-linux-webview` (requires Qt5 libraries)
 
 ### 🧭 Navigation
 
@@ -140,15 +141,29 @@ Set your server URL in the upload interface:
 - Default: `https://gyropilots.com/streameradmin/`
 - Custom servers supported for private deployments
 
-## Building Standalone Executable
+## Building Standalone Executables
 
-### Windows
+Executables are automatically built using GitHub Actions workflows:
+
+### 📦 Automated Builds
+- **Windows**: `.github/workflows/build-windows.yml` → `StreamerViewer-windows.exe`
+- **macOS**: `.github/workflows/build-macos.yml` → `StreamerViewer-macos-x86_64` / `StreamerViewer-macos-arm64`
+- **Linux**: `.github/workflows/build-linux-webview.yml` → `Viewer-linux-webview`
+
+### 🔧 Manual Build
 ```bash
-cd windows
-build_standalone.bat
+# Build for current platform
+pyinstaller StreamerViewer.spec
 ```
 
-The executable will be created in `windows/dist/StreamerViewer_Standalone.exe`
+The executable will be created in `dist/StreamerViewer`
+
+For Linux with webview support:
+```bash
+# Use the specialized Linux webview build
+pyinstaller StreamerViewer-linux-webview.spec
+```
+Creates `dist/Viewer-linux`
 
 ## Dependencies
 
