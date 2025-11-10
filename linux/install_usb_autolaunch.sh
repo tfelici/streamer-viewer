@@ -66,8 +66,18 @@ if [ "$ACTION" != "add" ] || [ -z "$DEVNAME" ]; then
     exit 0
 fi
 
-# Wait a moment for the device to be fully mounted by KDE/udisks2
-sleep 3
+# Wait longer for the device to be fully mounted by KDE/udisks2
+sleep 5
+
+# Wait for mount to actually appear (up to 10 seconds)
+for i in {1..10}; do
+    if mount | grep -q "^$DEVNAME"; then
+        echo "$(date): Device $DEVNAME is now mounted"
+        break
+    fi
+    echo "$(date): Waiting for device $DEVNAME to be mounted (attempt $i/10)"
+    sleep 1
+done
 
 # Get the actual user from environment or fallback
 ACTUAL_USER="${SUDO_USER:-$USER}"
@@ -174,8 +184,15 @@ check_and_launch() {
     
     echo "$(date): Launching Streamer Viewer with data directory: $streamer_data_dir"
     
-    # Launch the application as the actual user
-    sudo -u "$ACTUAL_USER" DISPLAY=:0 "$VIEWER_EXECUTABLE" --data-dir "$streamer_data_dir" &
+    # Launch the application as the actual user with full environment
+    sudo -u "$ACTUAL_USER" -H bash -c "
+        export DISPLAY=:0
+        export HOME='$ACTUAL_HOME'
+        export USER='$ACTUAL_USER'
+        export XDG_RUNTIME_DIR='/run/user/$(id -u $ACTUAL_USER)'
+        cd '$ACTUAL_HOME'
+        '$VIEWER_EXECUTABLE' --data-dir '$streamer_data_dir' &
+    " &
     
     # Send notification to user
     sudo -u "$ACTUAL_USER" DISPLAY=:0 notify-send \
