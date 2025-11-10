@@ -66,18 +66,8 @@ if [ "$ACTION" != "add" ] || [ -z "$DEVNAME" ]; then
     exit 0
 fi
 
-# Wait longer for the device to be fully mounted by KDE/udisks2
-sleep 5
-
-# Wait for mount to actually appear (up to 10 seconds)
-for i in {1..10}; do
-    if mount | grep -q "^$DEVNAME"; then
-        echo "$(date): Device $DEVNAME is now mounted"
-        break
-    fi
-    echo "$(date): Waiting for device $DEVNAME to be mounted (attempt $i/10)"
-    sleep 1
-done
+# Brief wait for mount to stabilize (since udev now triggers on mount)
+sleep 2
 
 # Get the actual user from environment or fallback
 ACTUAL_USER="${SUDO_USER:-$USER}"
@@ -279,13 +269,16 @@ echo -e "${GREEN}✓ Created USB handler script: $HANDLER_SCRIPT${NC}"
 echo -e "${BLUE}Creating udev rule...${NC}"
 cat > "$UDEV_RULE_FILE" << EOF
 # Streamer Viewer USB Auto-Launch Rule
-# Triggers when USB storage devices are inserted
+# Triggers when USB storage devices are mounted (not just inserted)
 # 
-# This rule detects USB storage devices and runs a script to check
-# for streamerData folders and launch Streamer Viewer accordingly
+# This rule detects when USB filesystems are actually mounted and accessible,
+# eliminating timing issues with mount detection
 
-ACTION=="add", KERNEL=="sd[a-z][0-9]*", SUBSYSTEM=="block", ENV{ID_FS_USAGE}=="filesystem", RUN+="$HANDLER_SCRIPT"
-ACTION=="add", KERNEL=="nvme[0-9]*p[0-9]*", SUBSYSTEM=="block", ENV{ID_FS_USAGE}=="filesystem", RUN+="$HANDLER_SCRIPT"
+# Trigger on mount events for USB block devices
+ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_USAGE}=="filesystem", ENV{ID_BUS}=="usb", RUN+="$HANDLER_SCRIPT"
+
+# Alternative: Also trigger on udisks2 mount events
+ACTION=="change", SUBSYSTEM=="block", ENV{ID_FS_USAGE}=="filesystem", ENV{UDISKS_FILESYSTEM_SHARED}=="1", RUN+="$HANDLER_SCRIPT"
 EOF
 
 echo -e "${GREEN}✓ Created udev rule: $UDEV_RULE_FILE${NC}"
