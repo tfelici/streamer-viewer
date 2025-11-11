@@ -915,10 +915,26 @@ def main():
     # Check if running in server-only mode
     server_only_mode = args.server_only
     
-    # Conditionally import UI modules only if not in server-only mode
+    # Always try to import pyi_splash to handle PyInstaller splash screen
     global webview, pyi_splash, SPLASH_AVAILABLE
     webview_available = False
     webview_module = None
+    
+    # Import splash screen support (PyInstaller) - needed even in server-only mode to close it
+    try:
+        import pyi_splash
+        SPLASH_AVAILABLE = True
+        
+        # In server-only mode, close splash screen immediately
+        if server_only_mode:
+            try:
+                pyi_splash.close()
+                SPLASH_AVAILABLE = False  # Prevent further splash updates
+            except Exception:
+                pass  # Ignore errors closing splash
+    except ImportError:
+        # No splash screen when running as script or PyInstaller not used
+        SPLASH_AVAILABLE = False
     
     if not server_only_mode:
         # Import UI modules only when needed
@@ -930,22 +946,13 @@ def main():
             webview_available = False
             print(f"Webview not available: {e}, will use browser fallback")
         
-        # Import splash screen support (PyInstaller)
-        try:
-            import pyi_splash
-            SPLASH_AVAILABLE = True
-        except ImportError:
-            # No splash screen when running as script or PyInstaller not used
-            SPLASH_AVAILABLE = False
-        
         # Update splash screen if available (PyInstaller builds)
-        update_splash_text("🚀 Starting Streamer Viewer...")
         if SPLASH_AVAILABLE:
+            update_splash_text("🚀 Starting Streamer Viewer...")
             time.sleep(1.0)  # Only delay if splash screen is visible
         
-        # Check if another instance is already running
-        update_splash_text("🔍 Checking for existing instance...")
-        if SPLASH_AVAILABLE:
+            # Check if another instance is already running
+            update_splash_text("🔍 Checking for existing instance...")
             time.sleep(0.3)
     
     existing_port = find_existing_instance()
