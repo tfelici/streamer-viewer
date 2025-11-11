@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """
 Streamer Viewer - Standalone GPS Track and Video Viewer
-Displays GPS tracks as lines on a map with synchronized video playback
+Displays GPS tracks as lines on a map with synchronized video playbook
 
 Command line usage:
-    python main.py [--data-dir PATH]
+    python main.py [--data-dir PATH] [--server-only]
 
 Arguments:
     --data-dir PATH    Specify custom path to streamer data directory
                       (default: ./streamerData)
+    --server-only     Start only the web server without opening webview or splash screen
 
 Examples:
     python main.py
     python main.py --data-dir "C:\\MyStreamerData"
     python main.py --data-dir "/home/user/streamer_data"
+    python main.py --server-only
+    python main.py --data-dir "/path/to/data" --server-only
 """
 
 import threading
@@ -80,6 +83,11 @@ def parse_arguments():
         '--data-dir', 
         type=str, 
         help='Path to the streamer data directory (default: ./streamerData)'
+    )
+    parser.add_argument(
+        '--server-only',
+        action='store_true',
+        help='Start only the web server without opening webview or splash screen'
     )
     return parser.parse_args()
 
@@ -914,34 +922,44 @@ def main():
     """Main function to start the application"""
     print("Starting Streamer Viewer...")
     
-    # Check webview availability once at startup
+    # Check if running in server-only mode
+    server_only_mode = args.server_only
+    
+    # Initialize UI components only if not in server-only mode
     webview_available = False
     webview_module = None
-    try:
-        if webview is not None:
-            webview_module = webview
-            webview_available = True
-        else:
-            # Try dynamic import
-            import webview as webview_module
-            webview_available = True
-    except (ImportError, NameError) as e:
-        webview_available = False
-        print(f"Webview not available: {e}, will use browser fallback")
-    
-    # Update splash screen if available (PyInstaller builds)
-    update_splash_text("🚀 Starting Streamer Viewer...")
-    if SPLASH_AVAILABLE:
-        time.sleep(1.0)  # Only delay if splash screen is visible
-    
-    # Check if another instance is already running
-    update_splash_text("🔍 Checking for existing instance...")
-    if SPLASH_AVAILABLE:
-        time.sleep(0.3)
+    if not server_only_mode:
+        # Check webview availability once at startup
+        try:
+            if webview is not None:
+                webview_module = webview
+                webview_available = True
+            else:
+                # Try dynamic import
+                import webview as webview_module
+                webview_available = True
+        except (ImportError, NameError) as e:
+            webview_available = False
+            print(f"Webview not available: {e}, will use browser fallback")
+        
+        # Update splash screen if available (PyInstaller builds)
+        update_splash_text("🚀 Starting Streamer Viewer...")
+        if SPLASH_AVAILABLE:
+            time.sleep(1.0)  # Only delay if splash screen is visible
+        
+        # Check if another instance is already running
+        update_splash_text("🔍 Checking for existing instance...")
+        if SPLASH_AVAILABLE:
+            time.sleep(0.3)
     
     existing_port = find_existing_instance()
     if existing_port:
         print(f"Found existing Streamer Viewer instance on port {existing_port}")
+        
+        if server_only_mode:
+            print("Server-only mode: Existing instance found, exiting...")
+            return  # Exit without opening UI
+        
         update_splash_text("✅ Opening existing instance...")
         if SPLASH_AVAILABLE:
             time.sleep(0.3)
@@ -990,10 +1008,11 @@ def main():
     else:
         print(f"Using default streamer data directory: {STREAMER_DATA_DIR}")
     
-    # Update splash screen if available
-    update_splash_text("📁 Checking data directories...")
-    if SPLASH_AVAILABLE:
-        time.sleep(0.8)
+    # Update splash screen if available and not server-only
+    if not server_only_mode:
+        update_splash_text("📁 Checking data directories...")
+        if SPLASH_AVAILABLE:
+            time.sleep(0.8)
         
     # Check if data directories exist        
     if not os.path.exists(STREAMER_DATA_DIR):
@@ -1004,42 +1023,63 @@ def main():
         print(f"Warning: Recordings directory not found: {RECORDINGS_DIR}")
     
     # Find available port
-    update_splash_text("🌐 Finding available port...")
-    if SPLASH_AVAILABLE:
-        time.sleep(0.3)
+    if not server_only_mode:
+        update_splash_text("🌐 Finding available port...")
+        if SPLASH_AVAILABLE:
+            time.sleep(0.3)
         
     port = find_available_port()
     if not port:
         print("No available ports found!")
-        close_splash()
+        if not server_only_mode:
+            close_splash()
         return
     
     print(f"Starting server on port {port}...")
     
-    update_splash_text(f"⚡ Starting web server on port {port}...")
-    if SPLASH_AVAILABLE:
-        time.sleep(0.4)
+    if not server_only_mode:
+        update_splash_text(f"⚡ Starting web server on port {port}...")
+        if SPLASH_AVAILABLE:
+            time.sleep(0.4)
     
     # Start Flask server in background thread
     server_thread = threading.Thread(target=start_flask_server, args=(port,))
     server_thread.daemon = True
     server_thread.start()
     
-    update_splash_text("🎯 Initializing web interface...")
-    if SPLASH_AVAILABLE:
-        time.sleep(0.4)
-        update_splash_text("🗺️ Loading GPS components...")
-        time.sleep(0.3)
-        update_splash_text("🎥 Preparing video player...")
-        time.sleep(0.3)
-        update_splash_text("✨ Almost ready...")
-        time.sleep(0.4)
+    if not server_only_mode:
+        update_splash_text("🎯 Initializing web interface...")
+        if SPLASH_AVAILABLE:
+            time.sleep(0.4)
+            update_splash_text("🗺️ Loading GPS components...")
+            time.sleep(0.3)
+            update_splash_text("🎥 Preparing video player...")
+            time.sleep(0.3)
+            update_splash_text("✨ Almost ready...")
+            time.sleep(0.4)
     
     # Wait a moment for server to start
     time.sleep(0.5)
     
     # Platform-specific UI approach
     window_url = f"http://127.0.0.1:{port}"
+    
+    # In server-only mode, just keep the server running
+    if server_only_mode:
+        print("=" * 60)
+        print("🚀 Streamer Viewer Server is now running!")
+        print(f"📍 Web interface: {window_url}")
+        print("🌐 Server-only mode: No UI will be opened automatically")
+        print("❌ Press Ctrl+C to stop the server")
+        print("=" * 60)
+        
+        # Keep server running
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\n👋 Shutting down Streamer Viewer server...")
+            return
     
     # Try webview first (available on all platforms), fallback to browser
     update_splash_text("✅ Ready! Opening application...")

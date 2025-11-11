@@ -324,49 +324,48 @@ LOADING_SERVER
     chown "$session_user:$session_user" "$loading_server" 2>/dev/null || true
 
     # Launch application in user session
-    log_message "Starting mini-server and launching Viewer application"
-    if [ "$active_display" = "wayland" ]; then
-        sudo -u "$session_user" bash -c "
-            export WAYLAND_DISPLAY='wayland-0'
-            export XDG_RUNTIME_DIR='/run/user/\$(id -u)'
-            export XDG_SESSION_TYPE='wayland'
-            cd '$desktop_dir'
-            
-            # Start mini loading server on port 5000
-            nohup python3 '$loading_server' >/dev/null 2>&1 &
-            sleep 1
-            
-            # Open Firefox with loading page immediately
-            firefox --kiosk http://localhost:5000 >/dev/null 2>&1 &
-            
-            # Start the main Viewer application
-            nohup '$viewer_executable' --data-dir='$data_dir' >/dev/null 2>&1 &
-        "
+    # Get user ID for XDG_RUNTIME_DIR
+    local user_id=$(id -u "$session_user")
+    
+    # Set appropriate display environment variable based on session type
+    local display_var display_value
+    if [ "$active_display" = "wayland-0" ]; then
+        log_message "Starting wayland mini-server and launching Viewer application"
+        # Detect actual Wayland display
+        local wayland_display=$(sudo -u "$session_user" bash -c 'echo $WAYLAND_DISPLAY' 2>/dev/null)
+        if [ -z "$wayland_display" ]; then
+            wayland_display="wayland-0"
+        fi
+        display_var="WAYLAND_DISPLAY"
+        display_value="$wayland_display"
     else
-        su - "$session_user" -c "
-            export DISPLAY='$active_display'
-            export XDG_RUNTIME_DIR='/run/user/\$(id -u)'
-            export XDG_SESSION_TYPE='x11'
-            export XDG_CURRENT_DESKTOP=KDE
-            export KDE_FULL_SESSION=true
-            export DESKTOP_SESSION=plasma
-            export GDK_BACKEND=x11
-            export QT_QPA_PLATFORM=xcb
-            export XDG_SESSION_CLASS=user
-            export XDG_SESSION_DESKTOP=plasma
-            cd '$desktop_dir'
-            
+        log_message "Starting X11 mini-server and launching Viewer application"
+        display_var="DISPLAY"
+        display_value="$active_display"
+    fi
+    
+    # Use systemd-run to create persistent user processes that survive sudo session termination
+    sudo systemd-run --uid="$session_user" --gid="$session_user" \
+        --setenv="$display_var=$display_value" \
+        --setenv=XDG_RUNTIME_DIR="/run/user/$user_id" \
+        --working-directory="$desktop_dir" \
+        bash -c "
             # Start mini loading server on port 5000
-            nohup python3 '$loading_server' >/dev/null 2>&1 &
+            python3 '$loading_server' &
+            SERVER_PID=\$!
             sleep 1
             
             # Open Firefox with loading page immediately
-            firefox --kiosk http://localhost:5000 >/dev/null 2>&1 &
+            firefox --kiosk http://localhost:5000 &
+            FIREFOX_PID=\$!
             
-            # Start the main Viewer application
-            nohup '$viewer_executable' --data-dir='$data_dir' >/dev/null 2>&1 &
+            # Start the main Viewer application in server-only mode
+            '$viewer_executable' --data-dir='$data_dir' --server-only &
+            VIEWER_PID=\$!
+            
+            # Wait for all processes to keep systemd service alive
+            wait
         "
-    fi
     log_message "Viewer application launched successfully"
     
     # Wait a moment for initial output
