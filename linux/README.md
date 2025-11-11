@@ -28,14 +28,18 @@ The USB autolaunch system provides a seamless plug-and-play experience for Strea
 
 **Stable Version (main branch):**
 ```bash
-# Download and install in one command (cache-busted)
-curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?$(date +%s)" | bash
+# Download, verify, then install (recommended)
+curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?$(date +%s)" -o install_usb_autolaunch.sh
+chmod +x install_usb_autolaunch.sh
+./install_usb_autolaunch.sh
 ```
 
 **Development Version (develop branch):**
 ```bash
-# Download and install development version (cache-busted)
-curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/develop/linux/install_usb_autolaunch.sh?$(date +%s)" | bash
+# Download, verify, then install (recommended)
+curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/develop/linux/install_usb_autolaunch.sh?$(date +%s)" -o install_usb_autolaunch.sh
+chmod +x install_usb_autolaunch.sh
+./install_usb_autolaunch.sh
 ```
 
 ### What Gets Installed
@@ -70,7 +74,7 @@ The installer creates a complete autolaunch system:
 - Wayland and X11 sessions
 - Most systemd-based distributions
 
-## � USB Drive Setup
+## 💾 USB Drive Setup
 
 ### Required Directory Structure
 Your USB drive must contain a `streamerData` folder with GPS tracks and video recordings:
@@ -183,7 +187,7 @@ sudo systemd-run --uid=user --gid=user \
 4. **📤 Unmounting**: Safely unmounts USB device
 5. **📝 Logging**: Records removal event and cleanup status
 
-## � Monitoring & Troubleshooting
+## 🔍 Monitoring & Troubleshooting
 
 ### Real-Time Log Monitoring
 ```bash
@@ -242,7 +246,7 @@ pkill -f "python3.*loading-server"
 systemctl list-units --type=service | grep run-
 ```
 
-## � Common Issues & Solutions
+## ❗ Common Issues & Solutions
 
 ### USB Not Being Detected
 
@@ -475,13 +479,20 @@ USB_EXECUTABLE="$mount_point/Your-Custom-Executable-Name"
 
 ### Complete Removal
 
-**One-Line Uninstall:**
+**Recommended Uninstall (Stable Version):**
 ```bash
-# Stable version
-curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh?$(date +%s)" | bash
+# Download, verify, then uninstall (recommended)
+curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh?$(date +%s)" -o uninstall_usb_autolaunch.sh
+chmod +x uninstall_usb_autolaunch.sh
+./uninstall_usb_autolaunch.sh
+```
 
-# Development version  
-curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/develop/linux/uninstall_usb_autolaunch.sh?$(date +%s)" | bash
+**Development Version:**
+```bash
+# Download, verify, then uninstall (recommended)
+curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/develop/linux/uninstall_usb_autolaunch.sh?$(date +%s)" -o uninstall_usb_autolaunch.sh
+chmod +x uninstall_usb_autolaunch.sh
+./uninstall_usb_autolaunch.sh
 ```
 
 ### Manual Uninstallation
@@ -552,7 +563,7 @@ See the [main README](../README.md) for complete cross-platform usage informatio
 - **X11 Display**: [X Window System](https://www.x.org/wiki/)
 - **Desktop Files**: [Desktop entry specification](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html)
 
-## � Best Practices & Tips
+## 💡 Best Practices & Tips
 
 ### USB Drive Optimization
 - **File System**: Use ext4, NTFS, or exFAT for best compatibility
