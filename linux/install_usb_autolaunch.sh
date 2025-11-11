@@ -246,25 +246,101 @@ launch_viewer() {
     
     log_message "Found active desktop session: $active_display for user $session_user"
     
+    # Create mini-server script for loading page in cache directory
+    local cache_dir="/home/$USERNAME/.cache/streamer-viewer"
+    mkdir -p "$cache_dir"
+    local loading_server="$cache_dir/loading-server.py"
+    cat > "$loading_server" << 'LOADING_SERVER'
+#!/usr/bin/env python3
+import http.server
+import socketserver
+import json
+import urllib.request
+from urllib.parse import urlparse
+
+class LoadingHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/':
+            self.serve_loading_page()
+        elif self.path == '/check':
+            self.check_main_server()
+        else:
+            self.send_error(404)
+    
+    def serve_loading_page(self):
+        html = '''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Streamer Viewer Loading</title>
+<style>
+body{margin:0;padding:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;
+height:100vh;color:white;}
+.container{text-align:center;}
+.loader{border:4px solid rgba(255,255,255,0.3);border-radius:50%;border-top:4px solid white;
+width:60px;height:60px;animation:spin 1s linear infinite;margin:0 auto 30px;}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+h1{font-size:2.5em;margin-bottom:20px;font-weight:300;}
+p{font-size:1.2em;opacity:0.8;margin:10px 0;}
+.status{margin-top:30px;font-size:1em;opacity:0.6;}
+</style></head><body>
+<div class="container"><div class="loader"></div><h1>Streamer Viewer</h1>
+<p>Starting application...</p><p class="status" id="status">Initializing...</p></div>
+<script>
+let attempt=0;const maxAttempts=30;const status=document.getElementById('status');
+function checkServer(){
+attempt++;status.textContent=`Connecting... (${attempt}/${maxAttempts})`;
+fetch('/check').then(r=>r.json()).then(data=>{
+if(data.ready){status.textContent='Ready! Redirecting...';
+setTimeout(()=>window.location.href='http://localhost:5001',500);}
+else throw new Error('Not ready');}).catch(()=>{
+if(attempt<maxAttempts)setTimeout(checkServer,1000);
+else{status.textContent='Connection failed';status.style.color='#ffcccb';}});}
+setTimeout(checkServer,2000);
+</script></body></html>'''
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(html.encode())
+    
+    def check_main_server(self):
+        try:
+            response = urllib.request.urlopen('http://localhost:5001', timeout=1)
+            ready = response.getcode() == 200
+        except:
+            ready = False
+        
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({'ready': ready}).encode())
+    
+    def log_message(self, format, *args): pass
+
+if __name__ == '__main__':
+    with socketserver.TCPServer(("", 5000), LoadingHandler) as httpd:
+        httpd.serve_forever()
+LOADING_SERVER
+
+    chmod +x "$loading_server"
+    chown "$session_user:$session_user" "$loading_server" 2>/dev/null || true
+
     # Launch application in user session
-    log_message "Launching Viewer application"
+    log_message "Starting mini-server and launching Viewer application"
     if [ "$active_display" = "wayland" ]; then
         sudo -u "$session_user" bash -c "
             export WAYLAND_DISPLAY='wayland-0'
             export XDG_RUNTIME_DIR='/run/user/\$(id -u)'
             export XDG_SESSION_TYPE='wayland'
             cd '$desktop_dir'
-            nohup '$viewer_executable' --data-dir='$data_dir' >/dev/null 2>&1 &
             
-            # Wait for web server to start, then open browser in kiosk mode
-            for i in {1..5}; do
-                # Check if port 5001 is listening using bash built-in TCP test
-                if timeout 1 bash -c 'exec 3<>/dev/tcp/localhost/5001; exec 3<&-' 2>/dev/null; then
-                    firefox --kiosk http://localhost:5001 >/dev/null 2>&1 &
-                    break
-                fi
-                sleep 2
-            done
+            # Start mini loading server on port 5000
+            nohup python3 '$loading_server' >/dev/null 2>&1 &
+            sleep 1
+            
+            # Open Firefox with loading page immediately
+            firefox --kiosk http://localhost:5000 >/dev/null 2>&1 &
+            
+            # Start the main Viewer application
+            nohup '$viewer_executable' --data-dir='$data_dir' >/dev/null 2>&1 &
         "
     else
         su - "$session_user" -c "
@@ -280,18 +356,15 @@ launch_viewer() {
             export XDG_SESSION_DESKTOP=plasma
             cd '$desktop_dir'
             
-            # Launch Viewer application
-            nohup '$viewer_executable' --data-dir='$data_dir' >/dev/null 2>&1 &
+            # Start mini loading server on port 5000
+            nohup python3 '$loading_server' >/dev/null 2>&1 &
+            sleep 1
             
-            # Wait for web server to start, then open browser in kiosk mode
-            for i in {1..5}; do
-                # Check if port 5001 is listening using bash built-in TCP test
-                if timeout 1 bash -c 'exec 3<>/dev/tcp/localhost/5001; exec 3<&-' 2>/dev/null; then
-                    firefox --kiosk http://localhost:5001 >/dev/null 2>&1 &
-                    break
-                fi
-                sleep 2
-            done
+            # Open Firefox with loading page immediately
+            firefox --kiosk http://localhost:5000 >/dev/null 2>&1 &
+            
+            # Start the main Viewer application
+            nohup '$viewer_executable' --data-dir='$data_dir' >/dev/null 2>&1 &
         "
     fi
     log_message "Viewer application launched successfully"
@@ -346,9 +419,26 @@ handle_removal() {
             pkill -f "Viewer-linux" 2>/dev/null || true
             
             # Kill Firefox browser processes (kiosk mode)
+            pkill -f "firefox.*localhost:5000" 2>/dev/null || true
             pkill -f "firefox.*localhost:5001" 2>/dev/null || true
             pkill firefox 2>/dev/null || true
+            
+            # Kill mini loading server
+            pkill -f "loading-server.py" 2>/dev/null || true
+            pkill -f "python3.*loading-server.py" 2>/dev/null || true
             sleep 1
+            
+            # Clean up cache directory and temporary files
+            local cache_dir="/home/$USERNAME/.cache/streamer-viewer"
+            if [ -d "$cache_dir" ]; then
+                log_message "Cleaning up cache directory: $cache_dir"
+                rm -rf "$cache_dir"
+                log_message "Cache directory cleaned up"
+            fi
+            
+            # Clean up any remaining temporary files
+            rm -f /tmp/viewer-launch-*.log 2>/dev/null || true
+            rm -f /tmp/viewer-pid-* 2>/dev/null || true
             
             # Try gentle unmount first, then lazy unmount as fallback
             if umount "$mount_point" 2>/dev/null; then
