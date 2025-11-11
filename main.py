@@ -35,29 +35,18 @@ from werkzeug.utils import secure_filename
 import requests
 from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 
-# Try to import webview early (available on all platforms)
-try:
-    import webview
-except ImportError:
-    webview = None
-# If webview import fails, it will be imported dynamically when needed
-
 # Pure Python MP4 parsing
 import struct
 
-# Splash screen support (PyInstaller - available on all platforms)
+# Initialize UI-related imports as None - will be imported conditionally after argument parsing
+webview = None
+pyi_splash = None
 SPLASH_AVAILABLE = False
-
-try:
-    import pyi_splash
-    SPLASH_AVAILABLE = True
-except ImportError:
-    # No splash screen when running as script or PyInstaller not used
-    pass
 
 def update_splash_text(text):
     """Update splash screen text (PyInstaller - available on all platforms)"""
-    if not SPLASH_AVAILABLE:
+    global SPLASH_AVAILABLE, pyi_splash
+    if not SPLASH_AVAILABLE or pyi_splash is None:
         print(f"[Streamer Viewer] {text}")  # Print to console when no splash screen
         return
         
@@ -68,7 +57,8 @@ def update_splash_text(text):
 
 def close_splash():
     """Close splash screen (PyInstaller - available on all platforms)"""
-    if not SPLASH_AVAILABLE:
+    global SPLASH_AVAILABLE, pyi_splash
+    if not SPLASH_AVAILABLE or pyi_splash is None:
         return
         
     try:
@@ -925,22 +915,28 @@ def main():
     # Check if running in server-only mode
     server_only_mode = args.server_only
     
-    # Initialize UI components only if not in server-only mode
+    # Conditionally import UI modules only if not in server-only mode
+    global webview, pyi_splash, SPLASH_AVAILABLE
     webview_available = False
     webview_module = None
+    
     if not server_only_mode:
-        # Check webview availability once at startup
+        # Import UI modules only when needed
         try:
-            if webview is not None:
-                webview_module = webview
-                webview_available = True
-            else:
-                # Try dynamic import
-                import webview as webview_module
-                webview_available = True
-        except (ImportError, NameError) as e:
+            import webview
+            webview_module = webview
+            webview_available = True
+        except ImportError as e:
             webview_available = False
             print(f"Webview not available: {e}, will use browser fallback")
+        
+        # Import splash screen support (PyInstaller)
+        try:
+            import pyi_splash
+            SPLASH_AVAILABLE = True
+        except ImportError:
+            # No splash screen when running as script or PyInstaller not used
+            SPLASH_AVAILABLE = False
         
         # Update splash screen if available (PyInstaller builds)
         update_splash_text("🚀 Starting Streamer Viewer...")
@@ -960,6 +956,7 @@ def main():
             print("Server-only mode: Existing instance found, exiting...")
             return  # Exit without opening UI
         
+        # not in server only mode, proceeding 
         update_splash_text("✅ Opening existing instance...")
         if SPLASH_AVAILABLE:
             time.sleep(0.3)
@@ -1082,9 +1079,10 @@ def main():
             return
     
     # Try webview first (available on all platforms), fallback to browser
-    update_splash_text("✅ Ready! Opening application...")
-    if SPLASH_AVAILABLE:
-        time.sleep(0.3)
+    if not server_only_mode:
+        update_splash_text("✅ Ready! Opening application...")
+        if SPLASH_AVAILABLE:
+            time.sleep(0.3)
     
     # Use webview if available, otherwise fallback to browser
     if webview_available and webview_module is not None:
