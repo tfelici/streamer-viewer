@@ -1,234 +1,423 @@
-# Streamer Viewer USB Auto-Launch for Linux
+# Streamer Viewer USB Autolaunch System for Linux
 
-This directory contains scripts to set up automatic launching of Streamer Viewer when a USB drive containing `streamerData` is inserted on Linux systems.
+A professional USB autolaunch system that automatically detects and launches Streamer Viewer when a USB drive containing `streamerData` is inserted. Features a sophisticated loading experience, Wayland/X11 compatibility, and reliable process management.
 
-## 📋 Overview
+## 🎯 Overview
 
-The USB auto-launch system consists of:
+The USB autolaunch system provides a seamless plug-and-play experience for Streamer Viewer deployment:
 
-- **udev rule**: Detects USB device insertion
-- **Handler script**: Checks for `streamerData` folder and manages executable
-- **Auto-launch**: Automatically runs Streamer Viewer with correct `--data-dir`
-- **Manual launcher**: GUI option for manual USB selection
+### ✨ Key Features
+- **🔌 Plug-and-Play Operation**: Automatic detection when USB with `streamerData` is inserted
+- **🎬 Professional Loading Experience**: Animated loading screen with connection status
+- **🖥️ Desktop Environment Support**: Compatible with Wayland and X11 systems
+- **⚡ Smart Process Management**: Uses systemd-run for reliable background operation
+- **🔄 Auto-Update System**: Automatically updates viewer executable from USB
+- **🧹 Intelligent Cleanup**: Proper cleanup and unmounting on USB removal
+- **📊 Comprehensive Logging**: Detailed logging for monitoring and troubleshooting
 
-## � Download
+### 🏗️ System Architecture
+- **udev Rules**: Detect USB insertion/removal events
+- **systemd Services**: Manage process lifecycle with persistence
+- **Mini HTTP Server**: Professional loading page on `localhost:5000`
+- **Main Application**: Launches in server-only mode on `localhost:5001`
+- **Browser Integration**: Firefox kiosk mode for seamless presentation
 
-### Get Streamer Viewer Linux Executable
+## 🚀 Quick Installation
 
-Before setting up USB auto-launch, you need the Linux executable:
+### One-Line Installation
 
-**Download Options:**
-- 🔗 **[Latest Release](https://github.com/tfelici/streamer-viewer/releases/latest)** - Download `Viewer-linux` from GitHub Releases
-- 📦 **[All Releases](https://github.com/tfelici/streamer-viewer/releases)** - Browse all versions
-
-**Setup:**
-1. Download the `Viewer-linux` executable
-2. Place it on your USB drive alongside the `streamerData` folder, OR
-3. Copy it to `~/Desktop/Viewer-linux` manually
-4. Make executable: `chmod +x Viewer-linux`
-
-The USB auto-launch system will automatically copy/update the executable from USB to desktop when needed.
-
-## 📥 Quick Download
-
-> **💡 Cache Note:** GitHub caches raw files for up to 5 minutes. For the latest version, use the cache-busted commands below or wait a few minutes after updates.
-
-**Installation Scripts:**
-- 🔗 **[install_usb_autolaunch.sh](https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?v=2025-11-10)** - Right-click → Save As
-- 🔗 **[uninstall_usb_autolaunch.sh](https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh?v=2025-11-10)** - Right-click → Save As
-
-**Quick Installation:**
+**Stable Version (main branch):**
 ```bash
-# Using curl (cache-busted)
-TIMESTAMP=$(date +%s)
-curl -O "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?v=$TIMESTAMP"
-mv "install_usb_autolaunch.sh?v=$TIMESTAMP" install_usb_autolaunch.sh
-chmod +x install_usb_autolaunch.sh
-./install_usb_autolaunch.sh
-
-# Or using wget (cache-busted)  
-TIMESTAMP=$(date +%s)
-wget -O install_usb_autolaunch.sh "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?v=$TIMESTAMP"
-chmod +x install_usb_autolaunch.sh
-./install_usb_autolaunch.sh
-
-# Simple version (may use cached file)
-curl -O https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh
-chmod +x install_usb_autolaunch.sh
-./install_usb_autolaunch.sh
+# Download and install in one command (cache-busted)
+curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?$(date +%s)" | bash
 ```
 
-## 🚀 Installation
-
-### Prerequisites
-
-- Linux system with udev (most modern distributions)
-- Root/sudo access for installation
-- Desktop environment with notification support (recommended)
-
-### Install
-
+**Development Version (develop branch):**
 ```bash
-# Make the installer executable
-chmod +x install_usb_autolaunch.sh
-
-# Run the installer with sudo
-./install_usb_autolaunch.sh
+# Download and install development version (cache-busted)
+curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/develop/linux/install_usb_autolaunch.sh?$(date +%s)" | bash
 ```
 
-## 📱 Usage
-
-### Automatic Launch
-
-1. **Prepare USB Drive**:
-   ```
-   USB Drive/
-   ├── streamerData/
-   │   ├── tracks/          # GPS track files (.tsv)
-   │   └── recordings/      # Video files
-   │       └── webcam/
-   └── Viewer-linux  # (optional) Executable
-   ```
-
-2. **Insert USB Drive**: System automatically detects and launches Streamer Viewer
-
-3. **Executable Management**:
-   - If `Streamer-Viewer-Linux` exists on USB → copied to `~/Desktop`
-   - If executable on USB is newer → updates desktop version
-   - If no executable on USB → uses existing desktop version
-
-### Manual Launch
-
-- **Applications Menu**: Look for "Streamer Viewer USB"
-- **Command Line**: `/usr/local/bin/streamer-viewer-manual-usb-launch.sh`
-
-## 🔧 What Gets Installed
+### What Gets Installed
+The installer creates a complete autolaunch system:
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| udev rule | `/etc/udev/rules.d/99-streamer-viewer-usb.rules` | USB detection |
-| Handler script | `/usr/local/bin/streamer-viewer-usb-handler.sh` | Main logic |
-| Manual launcher | `/usr/local/bin/streamer-viewer-manual-usb-launch.sh` | GUI selection |
-| Desktop entry | `/usr/share/applications/streamer-viewer-usb.desktop` | Menu entry |
-| Log file | `/var/log/streamer-viewer-usb.log` | Activity logging |
+| **udev Rules** | `/etc/udev/rules.d/99-rpi-streamer-usb.rules` | USB detection triggers |
+| **Handler Script** | `/usr/local/bin/rpi-streamer-usb-handler.sh` | Main autolaunch logic |
+| **systemd Services** | `/etc/systemd/system/rpi-streamer-usb*.service` | Process management |
+| **Log File** | `/var/log/rpi-streamer-usb.log` | Activity logging |
+| **Mount Point** | `/mnt/rpistreamer` | USB mounting location |
 
-## 📊 Monitoring and Troubleshooting
+## 📋 Prerequisites
 
-### View Logs
+### System Requirements
+- **Linux Distribution**: Any modern Linux with systemd and udev
+- **Desktop Environment**: X11 or Wayland compatible
+- **Permissions**: sudo access for installation
+- **Browser**: Firefox (for kiosk presentation)
+- **Python**: Python 3.6+ (for mini-server and main application)
+
+### Supported Desktop Environments
+✅ **Fully Tested:**
+- GNOME (Ubuntu, Fedora)
+- KDE Plasma (KDE Neon, openSUSE)
+- XFCE (Xubuntu)
+- Cinnamon (Linux Mint)
+
+✅ **Compatible:**
+- MATE, LXDE, LXQt, Budgie
+- Wayland and X11 sessions
+- Most systemd-based distributions
+
+## � USB Drive Setup
+
+### Required Directory Structure
+Your USB drive must contain a `streamerData` folder with GPS tracks and video recordings:
+
+```
+USB_Drive/
+├── streamerData/              # Required: Main data directory
+│   ├── tracks/                # GPS track files (.tsv format)
+│   │   ├── 2024-01-15_10-30-45.tsv
+│   │   ├── flight_001.tsv
+│   │   └── ...
+│   └── recordings/            # Video recordings
+│       └── webcam/            # Webcam video files
+│           ├── 2024-01-15_10-30-45.mp4
+│           ├── 2024-01-15_10-35-12.mp4
+│           └── ...
+└── Viewer-linux               # Optional: Latest executable
+```
+
+### Getting the Viewer-linux Executable
+
+**Option 1: Download from Releases**
 ```bash
-# Follow real-time logs
-sudo tail -f /var/log/streamer-viewer-usb.log
+# Download latest release
+wget https://github.com/tfelici/streamer-viewer/releases/latest/download/Viewer-linux
+
+# Make executable and place on USB
+chmod +x Viewer-linux
+cp Viewer-linux /path/to/your/usb/
+```
+
+**Option 2: Build from Source** 
+```bash
+# Clone and build
+git clone https://github.com/tfelici/streamer-viewer.git
+cd streamer-viewer
+pip install -r requirements.txt
+pyinstaller StreamerViewer.spec
+
+# Copy to USB
+cp dist/StreamerViewer/StreamerViewer /path/to/your/usb/Viewer-linux
+```
+
+## 🎬 How It Works
+
+### Complete Autolaunch Flow
+
+1. **🔌 USB Detection**
+   - udev detects USB insertion event
+   - Triggers systemd service for device processing
+
+2. **📁 Content Verification**  
+   - Mounts USB device to `/mnt/rpistreamer`
+   - Searches for `streamerData` folder
+   - Validates directory structure
+
+3. **🔄 Executable Management**
+   - Checks for `Viewer-linux` on USB drive
+   - Compares with existing desktop version
+   - Updates if newer version found
+
+4. **🖥️ Desktop Session Detection**
+   - Identifies active X11 or Wayland session
+   - Locates correct user and display environment
+   - Sets appropriate environment variables
+
+5. **🎭 Professional Loading Experience**
+   - Creates mini HTTP server on `localhost:5000`
+   - Generates animated loading page with connection status
+   - Opens Firefox in kiosk mode immediately
+
+6. **⚡ Application Launch**
+   - Launches Viewer-linux in server-only mode (`--server-only`)
+   - Main application runs on `localhost:5001`
+   - Uses systemd-run for persistent background operation
+
+7. **🔗 Seamless Transition**
+   - Loading page polls main server until ready
+   - Automatic redirect to full application
+   - User sees smooth, professional startup experience
+
+### Process Architecture
+
+**systemd-run Management:**
+```bash
+# Example of how processes are launched
+sudo systemd-run --uid=user --gid=user \
+    --setenv=DISPLAY=:0 \
+    --setenv=XDG_RUNTIME_DIR=/run/user/1000 \
+    --working-directory=/home/user/Desktop \
+    bash -c "
+        # Mini loading server
+        python3 loading-server.py &
+        
+        # Firefox kiosk mode  
+        firefox --kiosk http://localhost:5000 &
+        
+        # Main Streamer Viewer application
+        ./Viewer-linux --data-dir=/mnt/rpistreamer/streamerData --server-only &
+        
+        wait  # Keep systemd service alive
+    "
+```
+
+### USB Removal Handling
+
+1. **🔍 Detection**: udev detects USB removal event
+2. **🛑 Process Termination**: Kills all related processes (viewer, Firefox, mini-server)
+3. **🧹 Cleanup**: Removes cache files and temporary data
+4. **📤 Unmounting**: Safely unmounts USB device
+5. **📝 Logging**: Records removal event and cleanup status
+
+## � Monitoring & Troubleshooting
+
+### Real-Time Log Monitoring
+```bash
+# Follow autolaunch activity in real-time
+tail -f /var/log/rpi-streamer-usb.log
 
 # View recent activity
-sudo tail -50 /var/log/streamer-viewer-usb.log
+tail -50 /var/log/rpi-streamer-usb.log
+
+# Search for specific events
+grep -i "error\|failed\|success" /var/log/rpi-streamer-usb.log
 ```
 
-### Debug USB Auto-Launch Issues
-
-**Step 1: Verify Installation**
+### System Status Checks
 ```bash
-# Check if udev rule exists
-ls -la /etc/udev/rules.d/99-streamer-viewer-usb.rules
+# Verify installation components
+ls -la /etc/udev/rules.d/99-rpi-streamer-usb.rules
+ls -la /usr/local/bin/rpi-streamer-usb-handler.sh
+ls -la /etc/systemd/system/rpi-streamer-usb*.service
 
-# Check if handler script exists
-ls -la /usr/local/bin/streamer-viewer-usb-handler.sh
+# Check systemd services status
+systemctl status rpi-streamer-usb@sdb1.service
+systemctl status rpi-streamer-usb-remove@sdb1.service
 
-# Check if log file exists
-ls -la /var/log/streamer-viewer-usb.log
-```
-
-**Step 2: Check udev Rule Status**
-```bash
-# Test if udev rules are loaded
+# Reload udev rules if needed
 sudo udevadm control --reload-rules
 sudo udevadm trigger
-
-# Check udev rule syntax
-sudo udevadm test-builtin path_id /sys/block/sda  # Replace sda with your USB device
 ```
 
-**Step 3: Monitor USB Events**
+### USB Detection Testing
 ```bash
-# Watch udev events in real-time (run this, then insert USB)
+# Monitor USB events in real-time
 sudo udevadm monitor --property --subsystem-match=block
 
-# Alternative: monitor all USB events
-sudo udevadm monitor --kernel --udev --property
-```
+# Test specific USB device (replace sdb1 with your device)
+sudo udevadm test /sys/block/sdb/sdb1
 
-**Step 4: Manual USB Device Testing**
-```bash
-# Find your USB device
+# List currently mounted USB devices
 lsblk
-sudo fdisk -l
-
-# Check if your USB has the expected structure
 mount | grep /media
-ls -la /media/$USER/*/  # Check mounted USB drives
-ls -la /media/$USER/*/streamerData/  # Look for streamerData folder
+findmnt -D
 ```
 
-**Step 5: Test Handler Script Manually**
+### Process Management
 ```bash
-# Set environment variables and test handler directly
-export ACTION="add"
-export DEVNAME="/dev/sdb1"  # Replace with your USB device
-sudo -E /usr/local/bin/streamer-viewer-usb-handler.sh
+# Check running Streamer Viewer processes
+pgrep -f "Viewer-linux"
+ps aux | grep -E "(Viewer-linux|firefox.*localhost|python3.*loading-server)"
+
+# Kill processes manually if needed
+pkill -f "Viewer-linux"
+pkill -f "firefox.*localhost"
+pkill -f "python3.*loading-server"
+
+# Check systemd-run processes
+systemctl list-units --type=service | grep run-
 ```
 
-**Step 6: KDE Neon Specific Checks**
+## � Common Issues & Solutions
+
+### USB Not Being Detected
+
+**Problem**: USB drive inserted but nothing happens
 ```bash
-# Check if udisks2 is managing USB mounts (common in KDE)
-systemctl status udisks2
-
-# Check KDE's device notifier settings
-# Go to System Settings → Hardware → Removable Storage
-
-# Verify user is in plugdev group (needed for some USB operations)
-groups $USER
-```
-
-### Test USB Detection
-```bash
-# Test udev rule (replace sdX with your USB device)
-sudo udevadm test /sys/block/sdX
-
-# Reload udev rules manually
+# Check udev rule is active
 sudo udevadm control --reload-rules
 sudo udevadm trigger
+
+# Monitor USB events (insert USB while running)
+sudo udevadm monitor --property --subsystem-match=block
+
+# Verify streamerData folder exists
+find /media /mnt /run/media -name "streamerData" -type d 2>/dev/null
 ```
 
-### Manual Troubleshooting
+**Solution**: Verify USB has correct folder structure and udev rules are loaded
+
+### Application Won't Start
+
+**Problem**: USB detected but Viewer-linux doesn't launch
 ```bash
-# Check if USB drives are mounted
-mount | grep /media
-mount | grep /mnt
+# Check log for errors
+tail -20 /var/log/rpi-streamer-usb.log | grep -i error
 
-# Find streamerData folders
-find /media /mnt -name "streamerData" -type d 2>/dev/null
+# Verify executable permissions
+ls -la ~/Desktop/Viewer-linux
+chmod +x ~/Desktop/Viewer-linux
 
-# Check running instances
-pgrep -f "Streamer-Viewer-Linux"
-ps aux | grep -i streamer
+# Test manual launch
+~/Desktop/Viewer-linux --data-dir=/mnt/rpistreamer/streamerData --server-only
 ```
 
-## 🔄 How It Works
+**Solution**: Ensure executable has proper permissions and dependencies
 
-### Detection Flow
-1. **USB Insertion** → udev detects block device
-2. **Mounting Wait** → waits 3 seconds for KDE/udisks2 to mount
-3. **Mount Check** → looks for device-specific mounts first
-4. **Broad Search** → searches `/media/USER/*/`, `/run/media/USER/*/`, etc.
-5. **Folder Check** → searches for `streamerData/` in any mounted USB
-6. **Temporary Mount** → mounts device if still not found
-7. **Executable Management** → copies/updates if needed
-8. **Launch** → starts Streamer Viewer with `--data-dir`
+### Firefox/Loading Page Issues
 
-### Security Features
-- Runs as actual user (not root)
-- Checks file sizes and timestamps for updates
-- Prevents multiple instances with same data directory
-- Proper file permissions and ownership
+**Problem**: Firefox doesn't open or loading page not working
+```bash
+# Test Firefox availability
+which firefox
+firefox --version
+
+# Check if loading server started
+ss -tlnp | grep :5000
+curl -s http://localhost:5000
+
+# Test kiosk mode manually
+firefox --kiosk http://localhost:5000
+```
+
+**Solution**: Install Firefox or configure alternative browser in handler script
+
+### Wayland/X11 Compatibility
+
+**Problem**: Application launches but no window appears
+```bash
+# Check current session type
+echo $XDG_SESSION_TYPE
+loginctl list-sessions
+
+# Verify display environment
+echo $DISPLAY
+echo $WAYLAND_DISPLAY
+
+# Check running user processes
+ps aux | grep -E "(gnome|kde|xfce)" | head -5
+```
+
+**Solution**: systemd-run handles environment automatically, but verify user session is active
+
+### Process Persistence Issues
+
+**Problem**: Processes die when terminal closes
+```bash
+# Check if systemd-run is working
+systemctl list-units --type=service | grep run-
+
+# View systemd journal for errors
+journalctl -u "run-*" -n 20
+
+# Test systemd-run manually
+sudo systemd-run --uid=$USER --gid=$USER bash -c "sleep 30 & wait"
+```
+
+**Solution**: systemd-run provides process persistence - check systemd configuration
+
+### Permission Problems
+
+**Problem**: "Permission denied" errors in logs
+```bash
+# Check file ownership
+ls -la /mnt/rpistreamer/
+ls -la ~/Desktop/Viewer-linux
+
+# Verify user groups
+groups $USER
+id $USER
+
+# Fix ownership if needed
+sudo chown $USER:$USER ~/Desktop/Viewer-linux
+sudo chmod +x ~/Desktop/Viewer-linux
+```
+
+**Solution**: Ensure proper file permissions and user groups
+
+## ⚙️ Advanced Configuration
+
+### Customizing the Handler Script
+
+Edit `/usr/local/bin/rpi-streamer-usb-handler.sh` to customize behavior:
+
+```bash
+# Edit handler script
+sudo nano /usr/local/bin/rpi-streamer-usb-handler.sh
+```
+
+**Common Customizations:**
+
+**Change Desktop Location:**
+```bash
+# Around line 15
+DESKTOP_DIR="$HOME/Desktop"
+# Change to:
+DESKTOP_DIR="$HOME/Applications"  # or your preferred location
+```
+
+**Custom Executable Name:**
+```bash
+# Around line 180
+local viewer_executable="$desktop_dir/Viewer-linux"  
+# Change to:
+local viewer_executable="$desktop_dir/MyCustomName"
+```
+
+**Alternative Browser:**
+```bash
+# Around line 370
+firefox --kiosk http://localhost:5000 &
+# Change to:
+chromium --kiosk --app=http://localhost:5000 &
+# or:
+google-chrome --kiosk --app=http://localhost:5000 &
+```
+
+**Custom Loading Server Port:**
+```bash
+# Around line 300 (in loading server script)
+with socketserver.TCPServer(("", 5000), LoadingHandler) as httpd:
+# Change to:
+with socketserver.TCPServer(("", 8080), LoadingHandler) as httpd:
+```
+
+### Environment-Specific Settings
+
+**KDE Plasma Integration:**
+```bash
+# Disable KDE device notifier conflicts
+# System Settings → Hardware → Removable Storage
+# Uncheck "Enable automatic mounting of removable media"
+```
+
+**GNOME Settings:**
+```bash
+# Configure GNOME automount behavior
+gsettings set org.gnome.desktop.media-handling automount false
+gsettings set org.gnome.desktop.media-handling autorun-never true
+```
+
+**Network Access Configuration:**
+If deploying on systems without internet access, modify the loading server to use local resources:
+```bash
+# Edit loading server HTML (around line 250 in handler script)
+# Remove external CDN references and use local assets
+```
 
 ## 🗂️ Directory Structure Expected
 
@@ -282,94 +471,213 @@ sudo nano /usr/local/bin/streamer-viewer-usb-handler.sh
 USB_EXECUTABLE="$mount_point/Your-Custom-Executable-Name"
 ```
 
-## 🚫 Uninstallation
+## 🗑️ Uninstallation
 
-**Quick Uninstall:**
+### Complete Removal
+
+**One-Line Uninstall:**
 ```bash
-# Download and run uninstaller (cache-busted)
-TIMESTAMP=$(date +%s)
-curl -O "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh?v=$TIMESTAMP"
-mv "uninstall_usb_autolaunch.sh?v=$TIMESTAMP" uninstall_usb_autolaunch.sh
-chmod +x uninstall_usb_autolaunch.sh
-sudo ./uninstall_usb_autolaunch.sh
+# Stable version
+curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh?$(date +%s)" | bash
 
-# Or using wget (cache-busted)
-TIMESTAMP=$(date +%s)
-wget -O uninstall_usb_autolaunch.sh "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh?v=$TIMESTAMP"
-chmod +x uninstall_usb_autolaunch.sh
-sudo ./uninstall_usb_autolaunch.sh
-
-# Simple version (may use cached file)
-curl -O https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/uninstall_usb_autolaunch.sh
-chmod +x uninstall_usb_autolaunch.sh
-sudo ./uninstall_usb_autolaunch.sh
+# Development version  
+curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/develop/linux/uninstall_usb_autolaunch.sh?$(date +%s)" | bash
 ```
 
-**What gets removed**:
-- udev rule and handler scripts
-- Desktop entries and manual launcher
-- Optionally: log file
+### Manual Uninstallation
+If the uninstaller is unavailable, remove components manually:
 
-**What remains**:
-- `~/Desktop/Streamer-Viewer-Linux` (user can delete manually)
-- User data and configurations
+```bash
+# Remove udev rules
+sudo rm -f /etc/udev/rules.d/99-rpi-streamer-usb.rules
 
-## 🐛 Common Issues
+# Remove systemd services  
+sudo systemctl stop rpi-streamer-usb@*.service 2>/dev/null
+sudo systemctl disable rpi-streamer-usb@*.service 2>/dev/null
+sudo rm -f /etc/systemd/system/rpi-streamer-usb*.service
+sudo systemctl daemon-reload
 
-### USB Not Detected
-- Check if device is properly mounted: `mount | grep /media`
-- Verify udev rules are active: `sudo udevadm control --reload-rules`
-- Check logs for errors: `sudo tail /var/log/streamer-viewer-usb.log`
-- **USB Drive Names**: System searches any USB with `streamerData/` regardless of drive label (KINGSTON, USB_DRIVE, etc.)
-- **Manual Check**: Look for your USB: `find /media /run/media -name "streamerData" -type d 2>/dev/null`
+# Remove handler script
+sudo rm -f /usr/local/bin/rpi-streamer-usb-handler.sh
 
-### KDE Neon / Plasma Specific Issues
-- **Device Notifier Conflict**: KDE's device notifier may interfere
-  ```bash
-  # Disable KDE's auto-actions temporarily
-  # System Settings → Hardware → Removable Storage → uncheck auto-actions
-  ```
-- **udisks2 Integration**: KDE uses udisks2 for USB management
-  ```bash
-  # Check udisks2 service
-  systemctl status udisks2
-  
-  # Monitor udisks2 events
-  udisksctl monitor
-  ```
-- **Polkit Permissions**: Check if polkit is blocking udev actions
-  ```bash
-  # Check polkit rules
-  sudo ls -la /etc/polkit-1/rules.d/
-  
-  # Add user to plugdev group if needed
-  sudo usermod -a -G plugdev $USER
-  ```
+# Remove log file (optional)
+sudo rm -f /var/log/rpi-streamer-usb.log
 
-### Executable Not Copying
-- Verify executable exists on USB and has correct name
-- Check file permissions: `ls -la /path/to/usb/Streamer-Viewer-Linux`
-- Ensure Desktop directory exists: `mkdir -p ~/Desktop`
+# Reload udev rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
 
-### Application Won't Start  
-- Check executable permissions: `chmod +x ~/Desktop/Streamer-Viewer-Linux`
-- Verify data directory structure on USB
-- Check for missing dependencies: `ldd ~/Desktop/Streamer-Viewer-Linux`
+### What Remains After Uninstallation
+- **~/Desktop/Viewer-linux**: User executable (remove manually if desired)
+- **~/.cache/streamer-viewer**: Cache directory (cleaned automatically)
+- **User Data**: streamerData folders on USB drives remain unchanged
 
-### Multiple Instances
-- System prevents multiple instances with same data directory
-- Close existing instance or use different USB drive
-- Check running processes: `pgrep -f Streamer-Viewer-Linux`
+## 🔗 Integration with Main Application
 
-## 💡 Tips
+### Server-Only Mode Integration
+The autolaunch system leverages the main application's server-only mode:
 
-- **Performance**: Keep USB drives formatted as ext4 or NTFS for best compatibility
-- **Backup**: Regularly backup `streamerData` from USB drives  
-- **Updates**: New USB executable automatically updates desktop version
-- **Monitoring**: Use log file to track USB usage and troubleshoot issues
+```bash
+# How the autolaunch calls the main application
+./Viewer-linux --data-dir="/mnt/rpistreamer/streamerData" --server-only
+```
 
-## 🔗 Related Documentation
+This integration provides:
+- **Headless Operation**: No GUI components loaded
+- **Resource Efficiency**: Lower memory usage  
+- **Browser Access**: Full functionality via web interface
+- **API Access**: RESTful endpoints available
 
-- [Main Streamer Viewer README](../README.md)
-- [Command Line Arguments](../README.md#command-line-options)
-- [udev Rules Documentation](https://wiki.archlinux.org/title/Udev)
+### Cross-Platform Compatibility
+While this autolaunch system is Linux-specific, the main Streamer Viewer application supports:
+- **Windows**: Desktop mode with webview or browser
+- **macOS**: Native app bundles with webview
+- **Linux**: Both desktop and server-only modes
+
+See the [main README](../README.md) for complete cross-platform usage information.
+
+## 📚 Technical References
+
+### systemd-run Documentation
+- **Process Management**: [systemd-run man page](https://www.freedesktop.org/software/systemd/man/systemd-run.html)
+- **User Services**: [systemd user services guide](https://wiki.archlinux.org/title/Systemd/User)
+
+### udev Documentation  
+- **Rules Syntax**: [udev rules writing guide](https://wiki.archlinux.org/title/Udev)
+- **USB Device Detection**: [Linux USB device handling](https://www.kernel.org/doc/html/latest/driver-api/usb/hotplug.html)
+
+### Desktop Environment Integration
+- **Wayland Protocol**: [Wayland display server](https://wayland.freedesktop.org/)
+- **X11 Display**: [X Window System](https://www.x.org/wiki/)
+- **Desktop Files**: [Desktop entry specification](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html)
+
+## � Best Practices & Tips
+
+### USB Drive Optimization
+- **File System**: Use ext4, NTFS, or exFAT for best compatibility
+- **Performance**: USB 3.0+ recommended for large video files
+- **Labeling**: Use descriptive labels (optional) - system detects by content
+- **Backup**: Regularly backup `streamerData` folders
+
+### Security Considerations
+- **File Permissions**: System runs as user (not root) for security
+- **Network Access**: Only local ports used (5000, 5001)
+- **Process Isolation**: systemd-run provides process containerization
+- **Clean Shutdown**: USB removal properly terminates all processes
+
+### Performance Tuning
+```bash
+# Monitor resource usage
+htop
+iostat -x 1
+
+# Check USB transfer speeds
+sudo hdparm -tT /dev/sdb  # Replace with your USB device
+
+# Optimize mount options in handler script if needed
+mount -o noatime,nodiratime /dev/sdb1 /mnt/rpistreamer
+```
+
+### Multi-User Environments
+- Each user needs separate installation
+- Log files are system-wide in `/var/log/`
+- Desktop executables are per-user in `~/Desktop/`
+- Mount point `/mnt/rpistreamer` is shared
+
+### Development & Testing
+```bash
+# Test autolaunch without USB insertion
+sudo ACTION=add DEVICE=/dev/sdb1 USERNAME=$USER /usr/local/bin/rpi-streamer-usb-handler.sh
+
+# Simulate USB removal
+sudo ACTION=remove DEVICE=/dev/sdb1 USERNAME=$USER /usr/local/bin/rpi-streamer-usb-handler.sh
+
+# Debug mode (add to handler script)
+set -x  # Enable bash debugging
+
+# Test mini-server independently
+cd ~/.cache/streamer-viewer
+python3 loading-server.py
+# Visit http://localhost:5000
+```
+
+## 📈 Version History
+
+### v2.2 (Current) - Professional USB Autolaunch
+- **systemd-run Integration**: Reliable process management with session persistence
+- **Professional Loading Experience**: Animated loading screen with connection status
+- **Wayland Compatibility**: Full support for modern desktop environments  
+- **Server-Only Mode**: Integrated headless operation support
+- **Enhanced Cleanup**: Comprehensive USB removal handling
+
+### v2.1 - Enhanced Reliability
+- **Improved Detection**: Better USB device recognition
+- **Process Management**: Enhanced background process handling
+- **Cross-Desktop Support**: KDE, GNOME, XFCE compatibility
+
+### v2.0 - Initial USB Autolaunch
+- **Basic Autolaunch**: Simple USB detection and application launch
+- **Desktop Integration**: Application menu entries
+- **Logging System**: Basic activity logging
+
+## 🤝 Support & Contributing
+
+### Getting Help
+- **Documentation**: [Main Streamer Viewer README](../README.md)
+- **Issues**: [GitHub Issues](https://github.com/tfelici/streamer-viewer/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/tfelici/streamer-viewer/discussions)
+
+### Reporting Issues
+When reporting autolaunch issues, include:
+```bash
+# System information
+uname -a
+lsb_release -a
+systemctl --version
+
+# USB device info
+lsblk
+mount | grep /media
+
+# Recent log entries
+tail -50 /var/log/rpi-streamer-usb.log
+
+# udev rule status
+sudo udevadm control --reload-rules
+sudo udevadm test /sys/block/sdb/sdb1  # Replace with your device
+```
+
+### Contributing Improvements
+- **Fork & PR**: Standard GitHub workflow
+- **Testing**: Test on different Linux distributions
+- **Documentation**: Update this README for new features
+
+### Linux Distribution Testing
+**Confirmed Working:**
+- Ubuntu 20.04, 22.04, 24.04
+- KDE Neon (latest)
+- Linux Mint 21, 22
+- Fedora 38, 39
+- openSUSE Tumbleweed
+
+**Community Testing Needed:**
+- Arch Linux, Manjaro
+- Debian 12
+- CentOS Stream, Rocky Linux
+- Elementary OS
+
+## 📄 License & Credits
+
+This USB autolaunch system is part of the Streamer Viewer project and inherits the same license terms.
+
+**Key Technologies:**
+- **systemd**: Process management and service lifecycle
+- **udev**: USB device detection and rule processing  
+- **Python**: Mini-server implementation and main application
+- **Firefox**: Kiosk mode presentation layer
+- **Linux Desktop Standards**: FreeDesktop.org specifications
+
+---
+
+*For the complete Streamer Viewer documentation, see the [main README](../README.md).*
