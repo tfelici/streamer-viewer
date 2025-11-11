@@ -258,7 +258,8 @@ launch_viewer() {
             
             # Wait for web server to start, then open browser in kiosk mode
             for i in {1..5}; do
-                if netstat -tln | grep -q ':5001'; then
+                # Check if port 5001 is listening using bash built-in TCP test
+                if timeout 1 bash -c 'exec 3<>/dev/tcp/localhost/5001; exec 3<&-' 2>/dev/null; then
                     firefox --kiosk http://localhost:5001 >/dev/null 2>&1 &
                     break
                 fi
@@ -284,7 +285,8 @@ launch_viewer() {
             
             # Wait for web server to start, then open browser in kiosk mode
             for i in {1..5}; do
-                if netstat -tln | grep -q ':5001'; then
+                # Check if port 5001 is listening using bash built-in TCP test
+                if timeout 1 bash -c 'exec 3<>/dev/tcp/localhost/5001; exec 3<&-' 2>/dev/null; then
                     firefox --kiosk http://localhost:5001 >/dev/null 2>&1 &
                     break
                 fi
