@@ -308,9 +308,9 @@ setTimeout(checkServer,2000);
     
     def check_main_server(self):
         try:
-            response = urllib.request.urlopen(f'http://localhost:{self.viewer_port}', timeout=1)
+            response = urllib.request.urlopen(f'http://localhost:{self.viewer_port}', timeout=3)
             ready = response.getcode() == 200
-        except:
+        except Exception as e:
             ready = False
         
         self.send_response(200)
@@ -321,64 +321,35 @@ setTimeout(checkServer,2000);
     def log_message(self, format, *args): pass
 
 if __name__ == '__main__':
-    server_port = int(sys.argv[1])
-    viewer_port = int(sys.argv[2])
+    import sys
+    import traceback
     
-    def handler_factory(*args, **kwargs):
-        return LoadingHandler(*args, viewer_port=viewer_port, **kwargs)
-    
-    with socketserver.TCPServer(("", server_port), handler_factory) as httpd:
-        httpd.serve_forever()
+    try:
+        server_port = int(sys.argv[1])
+        viewer_port = int(sys.argv[2])
+        
+        print(f"Starting mini-server on port {server_port}, viewer port {viewer_port}", flush=True)
+        
+        def handler_factory(*args, **kwargs):
+            return LoadingHandler(*args, viewer_port=viewer_port, **kwargs)
+        
+        with socketserver.TCPServer(("", server_port), handler_factory) as httpd:
+            print(f"Mini-server successfully listening on port {server_port}", flush=True)
+            httpd.serve_forever()
+    except Exception as e:
+        print(f"Mini-server error: {e}", flush=True)
+        traceback.print_exc()
+        sys.exit(1)
 LOADING_SERVER
 
     chmod +x "$loading_server"
     chown "$session_user:$session_user" "$loading_server" 2>/dev/null || true
 
-    # Find working port by actually trying to start mini-server
-    log_message "Finding working port for mini-server starting from 5000..."
-    local miniserver_port=""
-    local viewer_port=""
-    local server_pid=""
+    # Choose random mini-server port and set viewer port to be +1
+    local miniserver_port=$((5000 + RANDOM % 999))  # Leave room for +1
+    local viewer_port=$((miniserver_port + 1))
     
-    # Try ports starting from 5000
-    for port in $(seq 5000 5099); do
-        log_message "Trying to start mini-server on port $port..."
-        
-        # Try to start the mini-server on this port
-        python3 "$loading_server" "$port" "$((port + 1))" &
-        server_pid=$!
-        
-        # Give it a moment to start
-        sleep 0.5
-        
-        # Check if the process is still running and port is listening
-        local port_listening=false
-        if command -v ss >/dev/null 2>&1; then
-            ss -tuln 2>/dev/null | grep -q ":$port " && port_listening=true
-        else
-            # Fallback: try to connect to the port using bash built-in
-            (echo >/dev/tcp/127.0.0.1/$port) 2>/dev/null && port_listening=true
-        fi
-        
-        if kill -0 "$server_pid" 2>/dev/null && [ "$port_listening" = "true" ]; then
-            miniserver_port="$port"
-            viewer_port="$((port + 1))"
-            log_message "Mini-server successfully started on port $port, will use port $viewer_port for viewer"
-            break
-        else
-            # Kill the process if it's still running but failed to bind
-            kill "$server_pid" 2>/dev/null || true
-            wait "$server_pid" 2>/dev/null || true
-            log_message "Port $port failed, trying next port..."
-        fi
-    done
-    
-    if [ -z "$miniserver_port" ]; then
-        log_message "ERROR: Could not start mini-server on any port from 5000-5099"
-        return 1
-    fi
-    
-    log_message "Using ports: mini-server=$miniserver_port, viewer=$viewer_port (PID: $server_pid)"
+    log_message "Using sequential ports: mini-server=$miniserver_port, viewer=$viewer_port"
 
     # Launch application in user session
     # Get user ID for XDG_RUNTIME_DIR
@@ -402,30 +373,61 @@ LOADING_SERVER
     fi
     
     # Use systemd-run to create persistent user processes that survive sudo session termination
-    # Note: mini-server is already running (PID: $server_pid), we just need to start Firefox and viewer
     sudo systemd-run --uid="$session_user" --gid="$session_user" \
         --setenv="$display_var=$display_value" \
         --setenv=XDG_RUNTIME_DIR="/run/user/$user_id" \
         --working-directory="$desktop_dir" \
         bash -c "
-            # Mini-server is already running, just open Firefox with loading page
-            firefox --kiosk http://localhost:$miniserver_port &
-            FIREFOX_PID=\$!
+            # Create log file for debugging
+            LAUNCH_LOG=\"/tmp/streamer-launch-\$\$.log\"
+            exec 1> \"\$LAUNCH_LOG\"
+            exec 2>&1
+            
+            echo \"Starting mini loading server in user context...\"
+            
+            # Start mini loading server in user context with output capture
+            python3 '$loading_server' '$miniserver_port' '$viewer_port' &
+            SERVER_PID=\$!
+            
+            echo \"Mini-server started with PID: \$SERVER_PID\"
+            
+            # Give the server a moment to start
             sleep 1
             
-            # Start the main Viewer application in server-only mode with custom port
+            echo \"Mini-server started on port $miniserver_port\"
+            
+            echo \"Opening Firefox with loading page...\"
+            firefox --kiosk http://localhost:$miniserver_port &
+            FIREFOX_PID=\$!
+            
+            echo \"Starting main Viewer application...\"
             '$viewer_executable' --data-dir='$data_dir' --server-only --port='$viewer_port' &
             VIEWER_PID=\$!
             
-            # Wait for viewer process to keep systemd service alive
-            wait \$VIEWER_PID
+            echo \"All processes started: SERVER_PID=\$SERVER_PID, FIREFOX_PID=\$FIREFOX_PID, VIEWER_PID=\$VIEWER_PID\"
+            
+            # Wait for all processes to keep systemd service alive
+            wait
         "
     log_message "Viewer application launched successfully"
     
-    # Wait a moment for initial output
-    sleep 2
+    # Wait a moment for processes to initialize
+    sleep 3
     
-    # Log any initial output
+    # Check for launch log and capture any startup issues
+    local launch_log_pattern="/tmp/streamer-launch-*.log"
+    for launch_log in $launch_log_pattern; do
+        if [ -f "$launch_log" ]; then
+            log_message "Capture startup log from: $launch_log"
+            local launch_content=$(cat "$launch_log" 2>/dev/null)
+            if [ -n "$launch_content" ]; then
+                log_message "Launch output: $launch_content"
+            fi
+            # Keep the log file for debugging - don't delete it yet
+        fi
+    done
+    
+    # Log any initial output from temp file
     if [ -f "$temp_output" ]; then
         local output_content=$(cat "$temp_output" 2>/dev/null)
         if [ -n "$output_content" ]; then
@@ -478,16 +480,6 @@ handle_removal() {
             # Kill mini loading server (both systemd and standalone processes)
             pkill -f "loading-server.py" 2>/dev/null || true
             pkill -f "python3.*loading-server.py" 2>/dev/null || true
-            # Also kill any python processes listening on ports 5000-5099 (our mini-servers)
-            if command -v ss >/dev/null 2>&1; then
-                for port in $(seq 5000 5099); do
-                    local pids=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | cut -d= -f2)
-                    for pid in $pids; do
-                        [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
-                    done
-                done 2>/dev/null || true
-            fi
-            # Note: Without ss or netstat, we rely on pkill to catch the processes by name
             sleep 1
             
             # Clean up cache directory and temporary files
@@ -501,6 +493,7 @@ handle_removal() {
             # Clean up any remaining temporary files
             rm -f /tmp/viewer-launch-*.log 2>/dev/null || true
             rm -f /tmp/viewer-pid-* 2>/dev/null || true
+            rm -f /tmp/streamer-launch-*.log 2>/dev/null || true
             
             # Try gentle unmount first, then lazy unmount as fallback
             if umount "$mount_point" 2>/dev/null; then
