@@ -93,7 +93,7 @@ def open_browser(url):
     import webbrowser
     try:
         # Use Python's webbrowser module - it should handle default browser correctly
-        webbrowser.open(url, new=2)  # new=2 opens in new tab if possible
+        webbrowser.open(url, new=1)  # new=1 opens in new browser window if possible
         return True
     except Exception as e:
         print(f"Failed to open browser: {e}")
