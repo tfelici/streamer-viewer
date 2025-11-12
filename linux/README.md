@@ -24,14 +24,15 @@ The USB autolaunch system provides a seamless plug-and-play experience for Strea
 
 ## 🚀 Quick Installation
 
-### One-Line Installation
-
 **Stable Version (main branch):**
 ```bash
 # Download, verify, then install (recommended)
 curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/main/linux/install_usb_autolaunch.sh?$(date +%s)" -o install_usb_autolaunch.sh
 chmod +x install_usb_autolaunch.sh
 ./install_usb_autolaunch.sh
+
+# IMPORTANT: After installation, reload user systemd configuration
+systemctl --user daemon-reload
 ```
 
 **Development Version (develop branch):**
@@ -40,6 +41,9 @@ chmod +x install_usb_autolaunch.sh
 curl -sSL "https://raw.githubusercontent.com/tfelici/streamer-viewer/develop/linux/install_usb_autolaunch.sh?$(date +%s)" -o install_usb_autolaunch.sh
 chmod +x install_usb_autolaunch.sh
 ./install_usb_autolaunch.sh
+
+# IMPORTANT: After installation, reload user systemd configuration
+systemctl --user daemon-reload
 ```
 
 ### What Gets Installed
