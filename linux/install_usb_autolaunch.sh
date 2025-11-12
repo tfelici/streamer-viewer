@@ -187,28 +187,6 @@ copy_viewer() {
     fi
 }
 
-# Function to check if a port is available
-is_port_available() {
-    local port="$1"
-    # Use /proc/net (should work on most Linux systems)
-    ! grep -q ":[$(printf '%04X' $port)] " /proc/net/tcp /proc/net/tcp6 2>/dev/null
-}
-
-# Function to find available port starting from a given port
-find_available_port() {
-    local start_port="$1"
-    local max_port="${2:-$((start_port + 100))}"
-    
-    for port in $(seq "$start_port" "$max_port"); do
-        if is_port_available "$port"; then
-            echo "$port"
-            return 0
-        fi
-    done
-    
-    return 1  # No available port found
-}
-
 # Function to launch the viewer application
 launch_viewer() {
     local mount_point="/mnt/rpistreamer"
@@ -356,24 +334,51 @@ LOADING_SERVER
     chmod +x "$loading_server"
     chown "$session_user:$session_user" "$loading_server" 2>/dev/null || true
 
-    # Find available ports for mini-server and viewer application
-    log_message "Finding available ports starting from 5000..."
-    local miniserver_port
-    local viewer_port
+    # Find working port by actually trying to start mini-server
+    log_message "Finding working port for mini-server starting from 5000..."
+    local miniserver_port=""
+    local viewer_port=""
+    local server_pid=""
     
-    miniserver_port=$(find_available_port 5000)
+    # Try ports starting from 5000
+    for port in $(seq 5000 5099); do
+        log_message "Trying to start mini-server on port $port..."
+        
+        # Try to start the mini-server on this port
+        python3 "$loading_server" "$port" "$((port + 1))" &
+        server_pid=$!
+        
+        # Give it a moment to start
+        sleep 0.5
+        
+        # Check if the process is still running and port is listening
+        local port_listening=false
+        if command -v ss >/dev/null 2>&1; then
+            ss -tuln 2>/dev/null | grep -q ":$port " && port_listening=true
+        else
+            # Fallback: try to connect to the port using bash built-in
+            (echo >/dev/tcp/127.0.0.1/$port) 2>/dev/null && port_listening=true
+        fi
+        
+        if kill -0 "$server_pid" 2>/dev/null && [ "$port_listening" = "true" ]; then
+            miniserver_port="$port"
+            viewer_port="$((port + 1))"
+            log_message "Mini-server successfully started on port $port, will use port $viewer_port for viewer"
+            break
+        else
+            # Kill the process if it's still running but failed to bind
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+            log_message "Port $port failed, trying next port..."
+        fi
+    done
+    
     if [ -z "$miniserver_port" ]; then
-        log_message "ERROR: Could not find available port for mini-server starting from 5000"
+        log_message "ERROR: Could not start mini-server on any port from 5000-5099"
         return 1
     fi
     
-    viewer_port=$(find_available_port $((miniserver_port + 1)))
-    if [ -z "$viewer_port" ]; then
-        log_message "ERROR: Could not find available port for viewer application starting from $((miniserver_port + 1))"
-        return 1
-    fi
-    
-    log_message "Using ports: mini-server=$miniserver_port, viewer=$viewer_port"
+    log_message "Using ports: mini-server=$miniserver_port, viewer=$viewer_port (PID: $server_pid)"
 
     # Launch application in user session
     # Get user ID for XDG_RUNTIME_DIR
@@ -397,26 +402,23 @@ LOADING_SERVER
     fi
     
     # Use systemd-run to create persistent user processes that survive sudo session termination
+    # Note: mini-server is already running (PID: $server_pid), we just need to start Firefox and viewer
     sudo systemd-run --uid="$session_user" --gid="$session_user" \
         --setenv="$display_var=$display_value" \
         --setenv=XDG_RUNTIME_DIR="/run/user/$user_id" \
         --working-directory="$desktop_dir" \
         bash -c "
-            # Start mini loading server on dynamic port
-            python3 '$loading_server' '$miniserver_port' '$viewer_port' &
-            SERVER_PID=\$!
-            sleep 1
-            
-            # Open Firefox with loading page immediately
+            # Mini-server is already running, just open Firefox with loading page
             firefox --kiosk http://localhost:$miniserver_port &
             FIREFOX_PID=\$!
+            sleep 1
             
             # Start the main Viewer application in server-only mode with custom port
             '$viewer_executable' --data-dir='$data_dir' --server-only --port='$viewer_port' &
             VIEWER_PID=\$!
             
-            # Wait for all processes to keep systemd service alive
-            wait
+            # Wait for viewer process to keep systemd service alive
+            wait \$VIEWER_PID
         "
     log_message "Viewer application launched successfully"
     
@@ -473,9 +475,19 @@ handle_removal() {
             pkill -f "firefox.*localhost:" 2>/dev/null || true
             pkill firefox 2>/dev/null || true
             
-            # Kill mini loading server
+            # Kill mini loading server (both systemd and standalone processes)
             pkill -f "loading-server.py" 2>/dev/null || true
             pkill -f "python3.*loading-server.py" 2>/dev/null || true
+            # Also kill any python processes listening on ports 5000-5099 (our mini-servers)
+            if command -v ss >/dev/null 2>&1; then
+                for port in $(seq 5000 5099); do
+                    local pids=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -o 'pid=[0-9]*' | cut -d= -f2)
+                    for pid in $pids; do
+                        [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+                    done
+                done 2>/dev/null || true
+            fi
+            # Note: Without ss or netstat, we rely on pkill to catch the processes by name
             sleep 1
             
             # Clean up cache directory and temporary files
