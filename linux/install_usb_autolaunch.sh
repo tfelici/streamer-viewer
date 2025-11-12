@@ -160,9 +160,9 @@ check_streamer_data() {
 # Function to copy and update Viewer-linux
 copy_viewer() {
     local mount_point="/mnt/rpistreamer"
-    local desktop_dir="/home/$USERNAME/Desktop"
+    local cache_dir="/home/$USERNAME/.cache/streamer-viewer"
     local source_file="$mount_point/Viewer-linux"
-    local dest_file="$desktop_dir/Viewer-linux"
+    local dest_file="$cache_dir/Viewer-linux"
     
     if [ ! -f "$source_file" ]; then
         log_message "Viewer-linux not found on USB drive"
@@ -175,11 +175,12 @@ copy_viewer() {
         pkill -f "Viewer-linux" 2>/dev/null || true
         sleep 1
         
-        log_message "Copying new version of Viewer-linux to desktop"
+        log_message "Copying new version of Viewer-linux to cache directory"
+        mkdir -p "$cache_dir"
         cp "$source_file" "$dest_file"
         chmod +x "$dest_file"
         chown "$USERNAME:$USERNAME" "$dest_file"
-        log_message "Viewer-linux copied and made executable"
+        log_message "Viewer-linux copied to cache and made executable"
         return 2  # Return 2 to indicate new version was copied
     else
         log_message "Viewer-linux is already up to date"
@@ -191,11 +192,11 @@ copy_viewer() {
 launch_viewer() {
     local mount_point="/mnt/rpistreamer"
     local data_dir="$mount_point/streamerData"
-    local desktop_dir="/home/$USERNAME/Desktop"
-    local viewer_executable="$desktop_dir/Viewer-linux"
+    local cache_dir="/home/$USERNAME/.cache/streamer-viewer"
+    local viewer_executable="$cache_dir/Viewer-linux"
     
     if [ ! -f "$viewer_executable" ]; then
-        log_message "Viewer-linux executable not found on desktop"
+        log_message "Viewer-linux executable not found in cache directory"
         return 1
     fi
     
@@ -376,7 +377,7 @@ LOADING_SERVER
     sudo systemd-run --uid="$session_user" --gid="$session_user" \
         --setenv="$display_var=$display_value" \
         --setenv=XDG_RUNTIME_DIR="/run/user/$user_id" \
-        --working-directory="$desktop_dir" \
+        --working-directory="$cache_dir" \
         bash -c "
             # Create log file for debugging
             LAUNCH_LOG=\"/tmp/streamer-launch-\$\$.log\"
@@ -482,12 +483,13 @@ handle_removal() {
             pkill -f "python3.*loading-server.py" 2>/dev/null || true
             sleep 1
             
-            # Clean up cache directory and temporary files
+            # Clean up temporary files but preserve the Viewer-linux executable
             local cache_dir="/home/$USERNAME/.cache/streamer-viewer"
             if [ -d "$cache_dir" ]; then
-                log_message "Cleaning up cache directory: $cache_dir"
-                rm -rf "$cache_dir"
-                log_message "Cache directory cleaned up"
+                log_message "Cleaning up temporary files in cache directory"
+                # Remove all files except Viewer-linux executable
+                find "$cache_dir" -type f ! -name "Viewer-linux" -delete 2>/dev/null || true
+                log_message "Temporary files cleaned up, Viewer-linux executable preserved"
             fi
             
             # Clean up any remaining temporary files
