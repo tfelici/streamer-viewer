@@ -4,19 +4,21 @@ Streamer Viewer - Standalone GPS Track and Video Viewer
 Displays GPS tracks as lines on a map with synchronized video playbook
 
 Command line usage:
-    python main.py [--data-dir PATH] [--server-only]
+    python main.py [--data-dir PATH] [--server-only] [--port PORT]
 
 Arguments:
     --data-dir PATH    Specify custom path to streamer data directory
                       (default: ./streamerData)
     --server-only     Start only the web server without opening webview or splash screen
+    --port PORT       Specify port for web server (default: auto-detect starting from 5001)
 
 Examples:
     python main.py
     python main.py --data-dir "C:\\MyStreamerData"
     python main.py --data-dir "/home/user/streamer_data"
     python main.py --server-only
-    python main.py --data-dir "/path/to/data" --server-only
+    python main.py --port 8080
+    python main.py --data-dir "/path/to/data" --server-only --port 3000
 """
 
 import threading
@@ -78,6 +80,11 @@ def parse_arguments():
         '--server-only',
         action='store_true',
         help='Start only the web server without opening webview or splash screen'
+    )
+    parser.add_argument(
+        '--port',
+        type=int,
+        help='Port to use for the web server (default: auto-detect available port starting from 5001)'
     )
     return parser.parse_args()
 
@@ -1026,18 +1033,29 @@ def main():
     if not os.path.exists(RECORDINGS_DIR):
         print(f"Warning: Recordings directory not found: {RECORDINGS_DIR}")
     
-    # Find available port
-    if not server_only_mode:
-        update_splash_text("🌐 Finding available port...")
-        if SPLASH_AVAILABLE:
-            time.sleep(0.3)
-        
-    port = find_available_port()
-    if not port:
-        print("No available ports found!")
+    # Find available port or use specified port
+    if args.port:
+        # Use specified port
+        port = args.port
+        if not is_port_available(port):
+            print(f"Error: Specified port {port} is not available!")
+            if not server_only_mode:
+                close_splash()
+            return
+        print(f"Using specified port: {port}")
+    else:
+        # Find available port automatically
         if not server_only_mode:
-            close_splash()
-        return
+            update_splash_text("🌐 Finding available port...")
+            if SPLASH_AVAILABLE:
+                time.sleep(0.3)
+            
+        port = find_available_port()
+        if not port:
+            print("No available ports found!")
+            if not server_only_mode:
+                close_splash()
+            return
     
     print(f"Starting server on port {port}...")
     
