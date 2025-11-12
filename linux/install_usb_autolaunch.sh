@@ -394,13 +394,11 @@ create_user_systemd_service() {
     # Create user systemd directory
     sudo -u "$USERNAME" mkdir -p "/home/$USERNAME/.config/systemd/user"
     
-    # Create cache directory and loading page script
+    # Create cache directory and loading page
     sudo -u "$USERNAME" mkdir -p "/home/$USERNAME/.cache/streamer-viewer"
     
-    # Create loading page generation script
-    sudo -u "$USERNAME" tee "/home/$USERNAME/.cache/streamer-viewer/create-loading-page.sh" > /dev/null << 'EOF'
-#!/bin/bash
-cat > "$HOME/.cache/streamer-viewer/loading.html" << 'LOADING_HTML'
+    # Create loading page directly
+    sudo -u "$USERNAME" tee "/home/$USERNAME/.cache/streamer-viewer/loading.html" > /dev/null << 'EOF'
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Streamer Viewer Loading</title>
 <style>
@@ -423,10 +421,7 @@ p{font-size:1.2em;opacity:0.8;margin:10px 0;}
 <div class="container"><div class="loader"></div><h1>Streamer Viewer</h1>
 <p>Loading GPS tracks and video recordings...</p></div>
 </body></html>
-LOADING_HTML
 EOF
-    
-    sudo -u "$USERNAME" chmod +x "/home/$USERNAME/.cache/streamer-viewer/create-loading-page.sh"
     
     # Create the viewer service file
     sudo -u "$USERNAME" tee "/home/$USERNAME/.config/systemd/user/viewer.service" > /dev/null << EOF
@@ -435,10 +430,9 @@ Description=Start Streamer Viewer desktop app
 DefaultDependencies=no
 
 [Service]
-Type=simple
+Type=forking
 ExecStartPre=/bin/sleep 3
-ExecStartPre=/home/$USERNAME/.cache/streamer-viewer/create-loading-page.sh
-ExecStart=/bin/bash -c 'firefox --kiosk file:///home/$USERNAME/.cache/streamer-viewer/loading.html & exec /home/$USERNAME/.cache/streamer-viewer/Viewer-linux --data-dir=/mnt/rpistreamer/streamerData'
+ExecStart=/bin/bash -c 'firefox --kiosk file:///home/$USERNAME/.cache/streamer-viewer/loading.html & /home/$USERNAME/.cache/streamer-viewer/Viewer-linux --data-dir=/mnt/rpistreamer/streamerData &'
 WorkingDirectory=/home/$USERNAME/.cache/streamer-viewer
 Environment=QT_QPA_PLATFORM=wayland
 Environment=MOZ_ENABLE_WAYLAND=1
