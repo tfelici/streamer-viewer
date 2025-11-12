@@ -187,6 +187,28 @@ copy_viewer() {
     fi
 }
 
+# Function to check if a port is available
+is_port_available() {
+    local port="$1"
+    # Use /proc/net (should work on most Linux systems)
+    ! grep -q ":[$(printf '%04X' $port)] " /proc/net/tcp /proc/net/tcp6 2>/dev/null
+}
+
+# Function to find available port starting from a given port
+find_available_port() {
+    local start_port="$1"
+    local max_port="${2:-$((start_port + 100))}"
+    
+    for port in $(seq "$start_port" "$max_port"); do
+        if is_port_available "$port"; then
+            echo "$port"
+            return 0
+        fi
+    done
+    
+    return 1  # No available port found
+}
+
 # Function to launch the viewer application
 launch_viewer() {
     local mount_point="/mnt/rpistreamer"
@@ -252,6 +274,7 @@ launch_viewer() {
     local loading_server="$cache_dir/loading-server.py"
     cat > "$loading_server" << 'LOADING_SERVER'
 #!/usr/bin/env python3
+import sys
 import http.server
 import socketserver
 import json
@@ -259,6 +282,10 @@ import urllib.request
 from urllib.parse import urlparse
 
 class LoadingHandler(http.server.BaseHTTPRequestHandler):
+    def __init__(self, *args, viewer_port=5001, **kwargs):
+        self.viewer_port = viewer_port
+        super().__init__(*args, **kwargs)
+    
     def do_GET(self):
         if self.path == '/':
             self.serve_loading_page()
@@ -268,32 +295,32 @@ class LoadingHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
     
     def serve_loading_page(self):
-        html = '''<!DOCTYPE html>
+        html = f'''<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Streamer Viewer Loading</title>
 <style>
-body{margin:0;padding:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+body{{margin:0;padding:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
 font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;
-height:100vh;color:white;}
-.container{text-align:center;}
-.loader{border:4px solid rgba(255,255,255,0.3);border-radius:50%;border-top:4px solid white;
-width:60px;height:60px;animation:spin 1s linear infinite;margin:0 auto 30px;}
-@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-h1{font-size:2.5em;margin-bottom:20px;font-weight:300;}
-p{font-size:1.2em;opacity:0.8;margin:10px 0;}
-.status{margin-top:30px;font-size:1em;opacity:0.6;}
+height:100vh;color:white;}}
+.container{{text-align:center;}}
+.loader{{border:4px solid rgba(255,255,255,0.3);border-radius:50%;border-top:4px solid white;
+width:60px;height:60px;animation:spin 1s linear infinite;margin:0 auto 30px;}}
+@keyframes spin{{0%{{transform:rotate(0deg)}}100%{{transform:rotate(360deg)}}}}
+h1{{font-size:2.5em;margin-bottom:20px;font-weight:300;}}
+p{{font-size:1.2em;opacity:0.8;margin:10px 0;}}
+.status{{margin-top:30px;font-size:1em;opacity:0.6;}}
 </style></head><body>
 <div class="container"><div class="loader"></div><h1>Streamer Viewer</h1>
 <p>Starting application...</p><p class="status" id="status">Initializing...</p></div>
 <script>
 let attempt=0;const maxAttempts=30;const status=document.getElementById('status');
-function checkServer(){
-attempt++;status.textContent=`Connecting... (${attempt}/${maxAttempts})`;
-fetch('/check').then(r=>r.json()).then(data=>{
-if(data.ready){status.textContent='Ready! Redirecting...';
-setTimeout(()=>window.location.href='http://localhost:5001',500);}
-else throw new Error('Not ready');}).catch(()=>{
+function checkServer(){{
+attempt++;status.textContent=`Connecting... (${{attempt}}/${{maxAttempts}})`;
+fetch('/check').then(r=>r.json()).then(data=>{{
+if(data.ready){{status.textContent='Ready! Redirecting...';
+setTimeout(()=>window.location.href='http://localhost:{self.viewer_port}',500);}}
+else throw new Error('Not ready');}}).catch(()=>{{
 if(attempt<maxAttempts)setTimeout(checkServer,1000);
-else{status.textContent='Connection failed';status.style.color='#ffcccb';}});}
+else{{status.textContent='Connection failed';status.style.color='#ffcccb';}}}});}}
 setTimeout(checkServer,2000);
 </script></body></html>'''
         self.send_response(200)
@@ -303,7 +330,7 @@ setTimeout(checkServer,2000);
     
     def check_main_server(self):
         try:
-            response = urllib.request.urlopen('http://localhost:5001', timeout=1)
+            response = urllib.request.urlopen(f'http://localhost:{self.viewer_port}', timeout=1)
             ready = response.getcode() == 200
         except:
             ready = False
@@ -316,12 +343,37 @@ setTimeout(checkServer,2000);
     def log_message(self, format, *args): pass
 
 if __name__ == '__main__':
-    with socketserver.TCPServer(("", 5000), LoadingHandler) as httpd:
+    server_port = int(sys.argv[1])
+    viewer_port = int(sys.argv[2])
+    
+    def handler_factory(*args, **kwargs):
+        return LoadingHandler(*args, viewer_port=viewer_port, **kwargs)
+    
+    with socketserver.TCPServer(("", server_port), handler_factory) as httpd:
         httpd.serve_forever()
 LOADING_SERVER
 
     chmod +x "$loading_server"
     chown "$session_user:$session_user" "$loading_server" 2>/dev/null || true
+
+    # Find available ports for mini-server and viewer application
+    log_message "Finding available ports starting from 5000..."
+    local miniserver_port
+    local viewer_port
+    
+    miniserver_port=$(find_available_port 5000)
+    if [ -z "$miniserver_port" ]; then
+        log_message "ERROR: Could not find available port for mini-server starting from 5000"
+        return 1
+    fi
+    
+    viewer_port=$(find_available_port $((miniserver_port + 1)))
+    if [ -z "$viewer_port" ]; then
+        log_message "ERROR: Could not find available port for viewer application starting from $((miniserver_port + 1))"
+        return 1
+    fi
+    
+    log_message "Using ports: mini-server=$miniserver_port, viewer=$viewer_port"
 
     # Launch application in user session
     # Get user ID for XDG_RUNTIME_DIR
@@ -350,17 +402,17 @@ LOADING_SERVER
         --setenv=XDG_RUNTIME_DIR="/run/user/$user_id" \
         --working-directory="$desktop_dir" \
         bash -c "
-            # Start mini loading server on port 5000
-            python3 '$loading_server' &
+            # Start mini loading server on dynamic port
+            python3 '$loading_server' '$miniserver_port' '$viewer_port' &
             SERVER_PID=\$!
             sleep 1
             
             # Open Firefox with loading page immediately
-            firefox --kiosk http://localhost:5000 &
+            firefox --kiosk http://localhost:$miniserver_port &
             FIREFOX_PID=\$!
             
-            # Start the main Viewer application in server-only mode
-            '$viewer_executable' --data-dir='$data_dir' --server-only &
+            # Start the main Viewer application in server-only mode with custom port
+            '$viewer_executable' --data-dir='$data_dir' --server-only --port='$viewer_port' &
             VIEWER_PID=\$!
             
             # Wait for all processes to keep systemd service alive
@@ -418,8 +470,7 @@ handle_removal() {
             pkill -f "Viewer-linux" 2>/dev/null || true
             
             # Kill Firefox browser processes (kiosk mode)
-            pkill -f "firefox.*localhost:5000" 2>/dev/null || true
-            pkill -f "firefox.*localhost:5001" 2>/dev/null || true
+            pkill -f "firefox.*localhost:" 2>/dev/null || true
             pkill firefox 2>/dev/null || true
             
             # Kill mini loading server
