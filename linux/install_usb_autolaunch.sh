@@ -290,7 +290,7 @@ create_systemd_service() {
     sudo tee "$SYSTEMD_SERVICE" > /dev/null << EOF
 [Unit]
 Description=RPI Streamer USB Handler for %i (Add)
-After=graphical-session.target
+DefaultDependencies=no
 
 [Service]
 Type=oneshot
@@ -300,12 +300,15 @@ ExecStartPre=/bin/bash -c '$USB_HANDLER_SCRIPT /dev/%i add $USERNAME'
 ExecStart=/usr/bin/systemctl --user start viewer.service
 RemainAfterExit=no
 TimeoutSec=30
+
+# Note: No [Install] section - this service is only started by udev USB events
 EOF
 
     # Service for USB removal (remove) - directly stops user service
     sudo tee "$SYSTEMD_REMOVAL_SERVICE" > /dev/null << EOF
 [Unit]
 Description=RPI Streamer USB Handler for %i (Remove)
+DefaultDependencies=no
 
 [Service]
 Type=oneshot
@@ -315,6 +318,8 @@ ExecStart=/usr/bin/systemctl --user stop viewer.service
 ExecStartPost=/bin/bash -c '$USB_HANDLER_SCRIPT /dev/%i remove $USERNAME'
 RemainAfterExit=no
 TimeoutSec=10
+
+# Note: No [Install] section - this service is only started by udev events
 EOF
 
     # Reload systemd
@@ -393,19 +398,25 @@ create_user_systemd_service() {
     sudo -u "$USERNAME" mkdir -p "/home/$USERNAME/.cache/streamer-viewer"
     
     # Create loading page generation script
-    sudo -u "$USERNAME" tee "/home/$USERNAME/.cache/streamer-viewer/create-loading-page.sh" > /dev/null << EOF
+    sudo -u "$USERNAME" tee "/home/$USERNAME/.cache/streamer-viewer/create-loading-page.sh" > /dev/null << 'EOF'
 #!/bin/bash
-cat > "\$HOME/.cache/streamer-viewer/loading.html" << 'LOADING_HTML'
+cat > "$HOME/.cache/streamer-viewer/loading.html" << 'LOADING_HTML'
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Streamer Viewer Loading</title>
 <style>
-body{margin:0;padding:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+body{margin:0;padding:0;
+background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
 font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;
-height:100vh;color:white;}
+height:100vh;color:white;
+animation:backgroundPulse 3s ease-in-out infinite;}
 .container{text-align:center;}
 .loader{border:4px solid rgba(255,255,255,0.3);border-radius:50%;border-top:4px solid white;
 width:60px;height:60px;animation:spin 1s linear infinite;margin:0 auto 30px;}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes backgroundPulse{
+0%{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);}
+50%{background:linear-gradient(135deg,#7b8ff0 0%,#8a5cb8 100%);}
+100%{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);}}
 h1{font-size:2.5em;margin-bottom:20px;font-weight:300;}
 p{font-size:1.2em;opacity:0.8;margin:10px 0;}
 </style></head><body>
@@ -421,7 +432,7 @@ EOF
     sudo -u "$USERNAME" tee "/home/$USERNAME/.config/systemd/user/viewer.service" > /dev/null << EOF
 [Unit]
 Description=Start Streamer Viewer desktop app
-After=graphical-session.target
+DefaultDependencies=no
 
 [Service]
 Type=simple
@@ -435,7 +446,8 @@ ExecStop=/bin/bash -c 'pkill -f "firefox" || true; pkill -f "Viewer-linux" || tr
 TimeoutStopSec=15
 Restart=no
 
-# Note: No [Install] section - this service is started manually by USB detection
+# Note: No [Install] section - this service is ONLY started manually by USB detection
+# NEVER auto-starts on boot, login, or session start
 EOF
 
     echo "User systemd service file created at /home/$USERNAME/.config/systemd/user/viewer.service"
