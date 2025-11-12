@@ -171,7 +171,7 @@ copy_viewer() {
     
     # Check if we need to copy (file doesn't exist or is different)
     if [ ! -f "$dest_file" ] || ! cmp -s "$source_file" "$dest_file"; then
-        log_message "New version detected - killing existing Viewer-linux processes"
+        log_message "New version detected - terminating existing Viewer-linux processes"
         pkill -f "Viewer-linux" 2>/dev/null || true
         sleep 1
         
@@ -389,6 +389,34 @@ create_user_systemd_service() {
     # Create user systemd directory
     sudo -u "$USERNAME" mkdir -p "/home/$USERNAME/.config/systemd/user"
     
+    # Create cache directory and loading page script
+    sudo -u "$USERNAME" mkdir -p "/home/$USERNAME/.cache/streamer-viewer"
+    
+    # Create loading page generation script
+    sudo -u "$USERNAME" tee "/home/$USERNAME/.cache/streamer-viewer/create-loading-page.sh" > /dev/null << EOF
+#!/bin/bash
+cat > "\$HOME/.cache/streamer-viewer/loading.html" << 'LOADING_HTML'
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Streamer Viewer Loading</title>
+<style>
+body{margin:0;padding:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;
+height:100vh;color:white;}
+.container{text-align:center;}
+.loader{border:4px solid rgba(255,255,255,0.3);border-radius:50%;border-top:4px solid white;
+width:60px;height:60px;animation:spin 1s linear infinite;margin:0 auto 30px;}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+h1{font-size:2.5em;margin-bottom:20px;font-weight:300;}
+p{font-size:1.2em;opacity:0.8;margin:10px 0;}
+</style></head><body>
+<div class="container"><div class="loader"></div><h1>Streamer Viewer</h1>
+<p>Loading GPS tracks and video recordings...</p></div>
+</body></html>
+LOADING_HTML
+EOF
+    
+    sudo -u "$USERNAME" chmod +x "/home/$USERNAME/.cache/streamer-viewer/create-loading-page.sh"
+    
     # Create the viewer service file
     sudo -u "$USERNAME" tee "/home/$USERNAME/.config/systemd/user/viewer.service" > /dev/null << EOF
 [Unit]
@@ -397,11 +425,13 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/home/$USERNAME/.cache/streamer-viewer/Viewer-linux --data-dir=/mnt/rpistreamer/streamerData
+ExecStartPre=/bin/sleep 3
+ExecStartPre=/home/$USERNAME/.cache/streamer-viewer/create-loading-page.sh
+ExecStart=/bin/bash -c 'firefox --kiosk file:///home/$USERNAME/.cache/streamer-viewer/loading.html & exec /home/$USERNAME/.cache/streamer-viewer/Viewer-linux --data-dir=/mnt/rpistreamer/streamerData'
 WorkingDirectory=/home/$USERNAME/.cache/streamer-viewer
 Environment=QT_QPA_PLATFORM=wayland
 Environment=MOZ_ENABLE_WAYLAND=1
-ExecStartPre=/bin/sleep 3
+ExecStop=/bin/bash -c 'pkill -f "firefox" || true; pkill -f "Viewer-linux" || true'
 TimeoutStopSec=15
 Restart=no
 
