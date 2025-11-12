@@ -432,7 +432,7 @@ DefaultDependencies=no
 [Service]
 Type=exec
 ExecStartPre=/bin/sleep 3
-ExecStart=/bin/bash -c 'firefox --kiosk file:///home/$USERNAME/.cache/streamer-viewer/loading.html & exec /home/$USERNAME/.cache/streamer-viewer/Viewer-linux --data-dir=/mnt/rpistreamer/streamerData'
+ExecStart=/bin/bash -c 'firefox --kiosk --no-crash-reporter --disable-crash-reporter --no-session-restore --disable-session-crashed-bubble file:///home/$USERNAME/.cache/streamer-viewer/loading.html & exec /home/$USERNAME/.cache/streamer-viewer/Viewer-linux --data-dir=/mnt/rpistreamer/streamerData'
 WorkingDirectory=/home/$USERNAME/.cache/streamer-viewer
 Environment=QT_QPA_PLATFORM=wayland
 Environment=MOZ_ENABLE_WAYLAND=1
