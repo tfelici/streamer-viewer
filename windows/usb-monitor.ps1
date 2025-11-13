@@ -140,7 +140,6 @@ $removeQuery = "SELECT * FROM __InstanceDeletionEvent WITHIN 2 WHERE TargetInsta
 try {
     # Register for insertion events
     Register-WmiEvent -Query $insertQuery -SourceIdentifier "USBInserted" -Action {
-        Start-Sleep -Seconds 3  # Wait for drive to be ready
         $Global:NeedRescan = $true
     } | Out-Null
     
