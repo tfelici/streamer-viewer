@@ -984,9 +984,8 @@ def main():
                 webview_module.create_window(
                     "Streamer Viewer", 
                     existing_url,
-                    width=1200,
-                    height=800,
-                    resizable=True
+                    resizable=True,
+                    fullscreen=True
                 )
                 # Close splash screen just before webview starts
                 close_splash()
@@ -1116,9 +1115,8 @@ def main():
             webview_module.create_window(
                 "Streamer Viewer", 
                 window_url,
-                width=1200,
-                height=800,
-                resizable=True
+                resizable=True,
+                fullscreen=True
             )
             # Close splash screen just before webview starts
             close_splash()
