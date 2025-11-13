@@ -86,6 +86,11 @@ def parse_arguments():
         type=int,
         help='Port to use for the web server (default: auto-detect available port starting from 5001)'
     )
+    parser.add_argument(
+        '--fullscreen',
+        action='store_true',
+        help='Start the application window in fullscreen mode'
+    )
     return parser.parse_args()
 
 def open_browser(url):
@@ -981,12 +986,22 @@ def main():
         # Use webview if available, otherwise fallback to browser
         if webview_available and webview_module is not None:
             try:
-                webview_module.create_window(
-                    "Streamer Viewer", 
-                    existing_url,
-                    resizable=True,
-                    fullscreen=True
-                )
+                # Create window with optional fullscreen
+                if args.fullscreen:
+                    webview_module.create_window(
+                        "Streamer Viewer", 
+                        existing_url,
+                        resizable=True,
+                        fullscreen=True
+                    )
+                else:
+                    webview_module.create_window(
+                        "Streamer Viewer", 
+                        existing_url,
+                        width=1200,
+                        height=800,
+                        resizable=True
+                    )
                 # Close splash screen just before webview starts
                 close_splash()
                 webview_module.start(debug=False)
@@ -1112,12 +1127,22 @@ def main():
     if webview_available and webview_module is not None:
         try:
             print(f"Opening webview window: {window_url}")
-            webview_module.create_window(
-                "Streamer Viewer", 
-                window_url,
-                resizable=True,
-                fullscreen=True
-            )
+            # Create window with optional fullscreen
+            if args.fullscreen:
+                webview_module.create_window(
+                    "Streamer Viewer", 
+                    window_url,
+                    resizable=True,
+                    fullscreen=True
+                )
+            else:
+                webview_module.create_window(
+                    "Streamer Viewer", 
+                    window_url,
+                    width=1200,
+                    height=800,
+                    resizable=True
+                )
             # Close splash screen just before webview starts
             close_splash()
             webview_module.start(debug=False)
