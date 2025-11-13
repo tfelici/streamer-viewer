@@ -19,16 +19,48 @@ Automatically launches Streamer Viewer when a USB drive containing the applicati
 
 ## Installation
 
-1. **Right-click** `install_usb_autolaunch.ps1`
-2. Select **"Run with PowerShell"** (will automatically request admin privileges)
-3. Follow the on-screen prompts
-4. Choose whether to start the monitor immediately or wait for next login
+### Quick Install (Recommended)
+
+**Option 1: Double-Click the Batch File (Easiest!)**
+1. Extract the zip file
+2. **Double-click** `INSTALL.bat`
+3. Click "Yes" when prompted for administrator privileges
+4. Done!
+
+**Option 2: Right-click Method**
+1. Extract the zip file
+2. **Right-click** `install_usb_autolaunch.ps1`
+3. Select **"Run with PowerShell"**
+4. If you see a security error, try Option 1 or Option 3
+
+**Option 3: Command Line (Works if other methods fail)**
+1. Extract the zip file
+2. Open PowerShell (no need for admin - script will auto-elevate)
+3. Navigate to the extracted folder:
+   ```powershell
+   cd "C:\Users\YourName\Downloads\Windows-USB-Autolaunch"
+   ```
+4. Run with bypass:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\install_usb_autolaunch.ps1
+   ```
 
 The installer will:
+- Automatically request administrator privileges
 - Copy the monitor script to `C:\Program Files\StreamerViewer\`
 - Create a Task Scheduler task that runs at login
 - Set appropriate PowerShell execution policy if needed
 - Start the USB monitor (if requested)
+
+### Troubleshooting Installation
+
+**"Cannot be loaded. The file is not digitally signed"**
+- Use Option 2 above with `-ExecutionPolicy Bypass`
+- This is a Windows security feature for unsigned scripts
+
+**"Access Denied" or "Requires Administrator"**
+- The script will automatically request admin privileges
+- Click "Yes" when the UAC prompt appears
 
 ## How It Works
 

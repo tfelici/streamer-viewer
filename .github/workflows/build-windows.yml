@@ -38,6 +38,7 @@ jobs:
     - name: Create Windows USB Autolaunch installer package
       run: |
         mkdir windows-usb-autolaunch
+        copy windows\INSTALL.bat windows-usb-autolaunch\
         copy windows\usb-monitor.ps1 windows-usb-autolaunch\
         copy windows\install_usb_autolaunch.ps1 windows-usb-autolaunch\
         copy windows\uninstall_usb_autolaunch.ps1 windows-usb-autolaunch\
