@@ -32,9 +32,44 @@ function Start-StreamerViewer {
     param($ExePath, $DataPath, $DriveLetter)
     
     try {
-        Write-Log "Starting Streamer Viewer: $ExePath --data-dir `"$DataPath`""
-        $process = Start-Process -FilePath $ExePath -ArgumentList "--data-dir", "`"$DataPath`"" -PassThru
+        Write-Log "Starting Streamer Viewer: $ExePath --data-dir `"$DataPath`" --fullscreen"
+        $process = Start-Process -FilePath $ExePath -ArgumentList "--data-dir", "`"$DataPath`"", "--fullscreen" -PassThru
         Write-Log "Started process with PID: $($process.Id) (app will open in fullscreen)"
+        
+        # Wait for window to appear and bring to foreground
+        Start-Sleep -Seconds 2
+        
+        # Define Windows API to bring window to foreground
+        if (-not ([System.Management.Automation.PSTypeName]'User32').Type) {
+            Add-Type @"
+                using System;
+                using System.Runtime.InteropServices;
+                public class User32 {
+                    [DllImport("user32.dll")]
+                    [return: MarshalAs(UnmanagedType.Bool)]
+                    public static extern bool SetForegroundWindow(IntPtr hWnd);
+                    
+                    [DllImport("user32.dll")]
+                    [return: MarshalAs(UnmanagedType.Bool)]
+                    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+                }
+"@
+        }
+        
+        # Try to bring window to foreground for up to 10 seconds
+        for ($i = 0; $i -lt 20; $i++) {
+            try {
+                $process.Refresh()
+                if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
+                    [User32]::ShowWindow($process.MainWindowHandle, 9) # 9 = SW_RESTORE (if minimized)
+                    [User32]::SetForegroundWindow($process.MainWindowHandle)
+                    Write-Log "Window brought to foreground"
+                    break
+                }
+            }
+            catch { }
+            Start-Sleep -Milliseconds 500
+        }
         
         return $DriveLetter
     }
