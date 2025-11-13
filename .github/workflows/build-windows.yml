@@ -35,8 +35,23 @@ jobs:
       run: |
         copy dist\StreamerViewer.exe dist\StreamerViewer-windows.exe
 
-    - name: Upload artifact
+    - name: Create Windows USB Autolaunch installer package
+      run: |
+        mkdir windows-usb-autolaunch
+        copy windows\usb-monitor.ps1 windows-usb-autolaunch\
+        copy windows\install_usb_autolaunch.ps1 windows-usb-autolaunch\
+        copy windows\uninstall_usb_autolaunch.ps1 windows-usb-autolaunch\
+        copy windows\README.md windows-usb-autolaunch\
+        Compress-Archive -Path windows-usb-autolaunch\* -DestinationPath dist\Windows-USB-Autolaunch.zip
+
+    - name: Upload executable artifact
       uses: actions/upload-artifact@v4
       with:
         name: StreamerViewer-windows
         path: dist/StreamerViewer-windows.exe
+
+    - name: Upload USB autolaunch installer artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Windows-USB-Autolaunch
+        path: dist/Windows-USB-Autolaunch.zip
