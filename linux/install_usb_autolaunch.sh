@@ -338,10 +338,10 @@ create_udev_rule() {
 # Triggers systemd services when USB storage devices are inserted or removed
 
 # Match USB storage devices partitions and trigger systemd service for ADD events
-SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_FS_USAGE}=="filesystem", ACTION=="add", TAG+="systemd", ENV{SYSTEMD_WANTS}="rpi-streamer-usb@%k.service"
+SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_BUS}=="usb", ENV{ID_FS_USAGE}=="filesystem", ACTION=="add", TAG+="systemd", ENV{SYSTEMD_WANTS}="rpi-streamer-usb@%k.service"
 
 # Match USB storage devices partitions and trigger systemd service for REMOVE events  
-SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ACTION=="remove", RUN+="/bin/systemctl start rpi-streamer-usb-remove@%k.service"
+SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_BUS}=="usb", ACTION=="remove", RUN+="/bin/systemctl start rpi-streamer-usb-remove@%k.service"
 EOF
 
     echo "Udev rule created at $UDEV_RULE_FILE"
