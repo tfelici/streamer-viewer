@@ -111,6 +111,8 @@
         function initializeMap() {
             // Create map
             map = L.map('map');
+            // Leaflet caches the container's pixel size, so force a recheck whenever it's resized (e.g. dragging the splitter)
+            new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById('map'));
 
             // Add OpenStreetMap tiles
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -161,11 +163,7 @@
                 mapContainer.style.flexShrink = '0';
                 videoContainer.style.flexGrow = '0';
                 videoContainer.style.flexShrink = '0';
-                
-                // Trigger map resize
-                if (map) {
-                    setTimeout(() => map.invalidateSize(), 0);
-                }
+                // map resize is handled automatically by the ResizeObserver set up in initializeMap()
             });
             
             document.addEventListener('mouseup', function() {
