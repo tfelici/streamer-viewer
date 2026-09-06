@@ -409,7 +409,7 @@ def find_all_related_videos(track_start_time, track_end_time, videos):
     
     return related_videos
 
-def get_recording_files():
+def get_recording_files(compute_duration=True):
     """Get list of recording files from the hierarchical recordings directory structure"""
     files = []
     
@@ -448,7 +448,7 @@ def get_recording_files():
     for mtime, file_path, display_name, domain, rtmpkey in all_files:
         try:
             size = os.path.getsize(file_path)
-            duration = get_video_duration_mediainfo(file_path)
+            duration = get_video_duration_mediainfo(file_path) if compute_duration else None
             
             # Extract timestamp from filename if possible (format: timestamp.mp4)
             filename = os.path.basename(file_path)
@@ -671,10 +671,26 @@ def delete_track():
 @app.route('/uploader')
 def uploader():
     """Recording upload page - Upload recordings to server"""
-    recording_files = get_recording_files()
+    # Render immediately with no duration; the page fetches each file's duration asynchronously
+    recording_files = get_recording_files(compute_duration=False)
     return render_template('uploader.html', 
-                         recording_files=recording_files,
-                         uploadrecordingsonly=True)
+                         recording_files=recording_files)
+
+
+def _is_allowed_recording_path(file_path):
+    """Restrict on-demand duration lookups to files under the known recordings directory."""
+    abs_path = os.path.abspath(file_path)
+    allowed_root = os.path.abspath(RECORDINGS_DIR)
+    return abs_path == allowed_root or abs_path.startswith(allowed_root + os.sep)
+
+
+@app.route('/recording-duration')
+def recording_duration():
+    """Lazily compute a single recording's duration (slow MediaInfo probe) on demand."""
+    file_path = request.args.get('path', '')
+    if not file_path or not os.path.isfile(file_path) or not _is_allowed_recording_path(file_path):
+        return jsonify({'error': 'Invalid file path'}), 400
+    return jsonify({'duration': get_video_duration_mediainfo(file_path)})
 
 @app.route('/upload-recording', methods=['POST'])
 def upload_recording():
